@@ -1,5 +1,15 @@
 # Multi-stage Dockerfile optimizado para Unraid
 # Incluye PostgreSQL embebido
+
+# Stage 0: Build del frontend React
+FROM node:20-slim AS frontend-builder
+
+WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm ci --prefer-offline
+COPY frontend/ ./
+RUN npm run build
+
 FROM python:3.11-bookworm AS builder
 
 WORKDIR /app
@@ -41,6 +51,9 @@ COPY alembic/ ./alembic/
 COPY alembic.ini .
 COPY init_db.py .
 COPY entrypoint.sh /entrypoint.sh
+
+# Copiar frontend buildeado
+COPY --from=frontend-builder /app/frontend/dist/ ./frontend/
 
 # Crear directorio de documentos y backups
 RUN mkdir -p /app/documents /app/backups/database && \
