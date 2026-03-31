@@ -201,7 +201,7 @@ export default function PaymentDetailPage({ user }) {
           await api.uploadDocument(id, doc, 'otro', '');
         }
         const names = actionDocuments.map(d => d.name).join(', ');
-        comentario = `${comentario} [Adjuntos: ${names}]`;
+        comentario = `${comentario}\n[Adjuntos: ${names}]`;
       }
       await api.advanceWorkflow(id, actionModal.area, comentario);
       setActionModal(null);
