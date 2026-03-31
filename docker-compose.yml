@@ -1,0 +1,24 @@
+services:
+  app:
+    build: .
+    container_name: payment-gestion
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./documents:/app/documents
+      - ./frontend/dist:/app/frontend
+      - ./backups:/app/backups
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATABASE_URL=postgresql://postgres:postgres@localhost:5432/payment_gestion
+      - DOCUMENTS_DIR=/app/documents
+      - STATIC_DIR=/app/frontend
+      - PGDATA=/var/lib/postgresql/data
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=payment_gestion
+    restart: unless-stopped
+
+volumes:
+  pgdata:
