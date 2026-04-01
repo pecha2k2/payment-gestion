@@ -268,20 +268,18 @@ export default function PaymentDetailPage({ user }) {
 
   const handleDownloadDocument = async (docId, docName) => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`/api/documents/public/${docId}/download?token=${token}`, {
-        credentials: 'include'
-      });
+      const url = await api.downloadDocument(docId);
+      const response = await fetch(url);
       if (!response.ok) throw new Error('Download failed');
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = url;
+      link.href = blobUrl;
       link.download = docName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(blobUrl);
     } catch (err) {
       console.error('Error downloading:', err);
       alert('Error descargando documento');
@@ -757,9 +755,20 @@ export default function PaymentDetailPage({ user }) {
                 </div>
                 <div className="document-actions">
                   {isPdf(doc.mime_type) && (
-                    <a href={api.viewDocument(doc.id)} target="_blank" className="btn btn-primary" rel="noopener noreferrer">
+                    <button
+                      className="btn btn-primary"
+                      onClick={async () => {
+                        try {
+                          const url = await api.viewDocument(doc.id);
+                          window.open(url, '_blank', 'noopener,noreferrer');
+                        } catch (err) {
+                          console.error('Error obteniendo token de documento:', err);
+                          alert('Error abriendo el documento. Intentá de nuevo.');
+                        }
+                      }}
+                    >
                       Ver
-                    </a>
+                    </button>
                   )}
                   <button className="btn btn-secondary" onClick={() => handleDownloadDocument(doc.id, doc.nombre_original)}>
                     Descargar

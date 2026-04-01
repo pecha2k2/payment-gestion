@@ -5,6 +5,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.payment import Document
 from app.services.auth import get_current_user
+from app.utils.security import create_document_token, decode_document_token
 import os
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
@@ -36,22 +37,31 @@ def download_document(
     )
 
 
+@router.post("/{document_id}/request-token")
+def request_document_token(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Issue a 60-second ephemeral JWT scoped to this document."""
+    document = db.query(Document).filter(Document.id == document_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Documento no encontrado")
+    token = create_document_token(current_user.id, document_id)
+    return {"token": token}
+
+
 @router.get("/public/{document_id}/view")
 def public_view_document(
     document_id: int, token: str = Query(...), db: Session = Depends(get_db)
 ):
-    """
-    Ver documento en el navegador usando token en query param.
-    Para uso interno - el frontend pasa el token de sesión.
-    """
-    from app.utils.security import decode_access_token
+    """Ver documento en el navegador usando token efímero."""
+    user_id = decode_document_token(token, document_id)
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
 
-    username = decode_access_token(token)
-    if not username:
-        raise HTTPException(status_code=401, detail="Token inválido")
-
-    user = db.query(User).filter(User.username == username).first()
-    if not user or not user.active:
+    user = db.query(User).filter(User.id == user_id, User.active == True).first()
+    if not user:
         raise HTTPException(status_code=401, detail="Usuario no autorizado")
 
     document = db.query(Document).filter(Document.id == document_id).first()
@@ -76,17 +86,13 @@ def public_view_document(
 def public_download_document(
     document_id: int, token: str = Query(...), db: Session = Depends(get_db)
 ):
-    """
-    Descargar documento usando token en query param.
-    """
-    from app.utils.security import decode_access_token
+    """Descargar documento usando token efímero."""
+    user_id = decode_document_token(token, document_id)
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
 
-    username = decode_access_token(token)
-    if not username:
-        raise HTTPException(status_code=401, detail="Token inválido")
-
-    user = db.query(User).filter(User.username == username).first()
-    if not user or not user.active:
+    user = db.query(User).filter(User.id == user_id, User.active == True).first()
+    if not user:
         raise HTTPException(status_code=401, detail="Usuario no autorizado")
 
     document = db.query(Document).filter(Document.id == document_id).first()

@@ -54,7 +54,11 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: formData,
-    }).then(r => r.json());
+    }).then(async (r) => {
+      const data = await r.json().catch(() => ({ detail: 'Error de autenticación' }));
+      if (!r.ok) throw new Error(data.detail || 'Error de autenticación');
+      return data;
+    });
   },
   logout: () => {
     setToken(null);
@@ -100,8 +104,15 @@ export const api = {
       body: formData,
     }).then(r => r.json());
   },
-  downloadDocument: (id) => `${API_BASE}/documents/public/${id}/download?token=${accessToken}`,
-  viewDocument: (id) => `${API_BASE}/documents/public/${id}/view?token=${accessToken}`,
+  requestDocumentToken: (id) => request(`/documents/${id}/request-token`, { method: 'POST' }),
+  downloadDocument: async (id) => {
+    const { token } = await api.requestDocumentToken(id);
+    return `${API_BASE}/documents/public/${id}/download?token=${token}`;
+  },
+  viewDocument: async (id) => {
+    const { token } = await api.requestDocumentToken(id);
+    return `${API_BASE}/documents/public/${id}/view?token=${token}`;
+  },
   deleteDocument: (id) => request(`/documents/${id}`, { method: 'DELETE' }),
 
   // Workflow

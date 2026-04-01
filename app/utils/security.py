@@ -35,3 +35,29 @@ def decode_access_token(token: str) -> Optional[str]:
         return username
     except JWTError:
         return None
+
+
+def create_document_token(user_id: int, doc_id: int, expires_seconds: int = 60) -> str:
+    """Create a short-lived JWT scoped to a single document."""
+    expire = datetime.utcnow() + timedelta(seconds=expires_seconds)
+    payload = {
+        "sub": str(user_id),
+        "purpose": "document_access",
+        "doc_id": doc_id,
+        "exp": expire,
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def decode_document_token(token: str, expected_doc_id: int):
+    """Decode an ephemeral document token. Returns user_id if valid, None otherwise."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("purpose") != "document_access":
+            return None
+        if payload.get("doc_id") != expected_doc_id:
+            return None
+        user_id = payload.get("sub")
+        return int(user_id) if user_id else None
+    except Exception:
+        return None

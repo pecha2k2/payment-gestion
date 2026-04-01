@@ -29,10 +29,41 @@ AREA_TO_ROLES = {
 }
 
 # Areas that require previous areas to be approved first (for workflow validation)
+# Used as fallback when no WorkflowConfig is found for a payment
 AREA_DEPENDENCIES = {
     "pagadora": ["aprobadora"],  # pagadora can't advance until aprobadora is done
     "sap": ["pagadora"],  # SAP can't advance until pagadora is done
 }
+
+
+def get_area_dependencies(db: Session, payment_id: int) -> dict:
+    """Derive area dependencies from the payment's WorkflowConfig.flujo_json.
+
+    Each area depends on the area immediately before it in the configured flow.
+    Falls back to AREA_DEPENDENCIES if no config is found.
+    """
+    payment = db.query(PaymentRequest).filter(PaymentRequest.id == payment_id).first()
+    if not payment or not payment.workflow_config_id:
+        return AREA_DEPENDENCIES
+
+    config = (
+        db.query(WorkflowConfig)
+        .filter(WorkflowConfig.id == payment.workflow_config_id)
+        .first()
+    )
+    if not config or not config.flujo_json:
+        return AREA_DEPENDENCIES
+
+    try:
+        areas = json.loads(config.flujo_json)
+    except (json.JSONDecodeError, TypeError):
+        return AREA_DEPENDENCIES
+
+    deps = {}
+    for i, area_name in enumerate(areas):
+        if i > 0:
+            deps[area_name] = [areas[i - 1]]
+    return deps
 
 
 def get_workflow_states(db: Session, payment_id: int) -> List[WorkflowState]:
@@ -62,8 +93,8 @@ def advance_workflow_state(
             f"No tienes permiso para realizar acciones en el área {area.value}"
         )
 
-    # Check dependencies: pagadora can't advance unless aprobadora is approved
-    dependencies = AREA_DEPENDENCIES.get(area.value, [])
+    # Check dependencies derived from the payment's configured workflow order
+    dependencies = get_area_dependencies(db, payment_id).get(area.value, [])
     for dep_area in dependencies:
         dep_state = (
             db.query(WorkflowState)
@@ -132,10 +163,8 @@ def advance_workflow_state(
 
     # Check if all workflow states are approved -> auto-complete payment
     if state.estado == WorkflowEstado.APROBADO:
-        payment_for_check = (
-            db.query(PaymentRequest).filter(PaymentRequest.id == payment_id).first()
-        )
-        if payment_for_check:
+        db.refresh(payment)
+        if payment:
             all_approved = (
                 db.query(WorkflowState)
                 .filter(
@@ -146,8 +175,8 @@ def advance_workflow_state(
                 == 0
             )
             if all_approved:
-                payment_for_check.estado_general = EstadoGeneral.COMPLETADA
-                payment_for_check.updated_at = datetime.now(timezone.utc)
+                payment.estado_general = EstadoGeneral.COMPLETADA
+                payment.updated_at = datetime.now(timezone.utc)
                 db.commit()
 
     return state

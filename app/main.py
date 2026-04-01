@@ -1,5 +1,6 @@
 import os
 import logging
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,10 +19,43 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db = SessionLocal()
+    try:
+        init_default_workflow_configs(db)
+
+        admin = db.query(User).filter(User.username == "admin").first()
+        if not admin:
+            admin_password = os.getenv("ADMIN_PASSWORD", "admin123")
+            if admin_password == "admin123":
+                logger.warning(
+                    "Using default admin password. Set ADMIN_PASSWORD env var in production."
+                )
+            admin = User(
+                username="admin",
+                password_hash=get_password_hash(admin_password),
+                name="Administrador",
+                email="admin@company.com",
+                role="admin",
+                area="Administración",
+                active=True,
+                created_at=datetime.now(timezone.utc),
+            )
+            db.add(admin)
+            db.commit()
+            logger.info("Default admin user created.")
+    finally:
+        db.close()
+    yield
+
+
 app = FastAPI(
     title="Payment Gestion API",
     description="Sistema de gestión documental de pagos",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # CORS — configurable via ALLOWED_ORIGINS env var (comma-separated)
@@ -71,32 +105,3 @@ def serve_spa(full_path: str):
     raise HTTPException(status_code=404)
 
 
-@app.on_event("startup")
-def startup_event():
-    # Initialize default workflow configs and admin user if not present
-    db = SessionLocal()
-    try:
-        init_default_workflow_configs(db)
-
-        admin = db.query(User).filter(User.username == "admin").first()
-        if not admin:
-            admin_password = os.getenv("ADMIN_PASSWORD", "admin123")
-            if admin_password == "admin123":
-                logger.warning(
-                    "Using default admin password. Set ADMIN_PASSWORD env var in production."
-                )
-            admin = User(
-                username="admin",
-                password_hash=get_password_hash(admin_password),
-                name="Administrador",
-                email="admin@company.com",
-                role="admin",
-                area="Administración",
-                active=True,
-                created_at=datetime.now(timezone.utc),
-            )
-            db.add(admin)
-            db.commit()
-            logger.info("Default admin user created.")
-    finally:
-        db.close()

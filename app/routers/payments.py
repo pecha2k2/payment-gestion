@@ -19,7 +19,7 @@ import shutil
 
 from app.database import get_db
 from app.models.user import User
-from app.models.payment import PaymentRequest, Document, DocumentoTipo
+from app.models.payment import PaymentRequest, Document, DocumentoTipo, EstadoGeneral
 from app.models.workflow import WorkflowState, WorkflowConfig, WorkflowEstado, Area
 from app.schemas.payment import (
     PaymentRequestCreate,
@@ -169,7 +169,7 @@ def cancel_payment(
             status_code=403, detail="No tienes permiso para cancelar esta petición"
         )
 
-    payment.estado_general = "CANCELADA"
+    payment.estado_general = EstadoGeneral.CANCELADA
     payment.updated_at = datetime.now(timezone.utc)
     db.commit()
     return {"message": "Petición cancelada"}
@@ -294,10 +294,11 @@ def reverse_workflow(
 def add_workflow_comment(
     payment_id: int,
     area: str,
-    contenido: str,
+    body: dict = Body(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    contenido = body.get("contenido", "")
     try:
         area_enum = Area[area]
     except KeyError:
