@@ -38,8 +38,9 @@ Sistema de gestión documental de pagos sobre Docker con PostgreSQL embebido.
 │  Almacenamiento persistente: /mnt/user/appdata/payment-gestion/
 │    ├── pgdata/        (volumen Docker — DB)                  │
 │    ├── documents/     (archivos subidos)                     │
-│    ├── frontend/dist/ (build de producción)                  │
 │    └── backups/       (backups)                              │
+│                                                              │
+│  Frontend React: embebido en la imagen Docker                │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -53,8 +54,9 @@ Sistema de gestión documental de pagos sobre Docker con PostgreSQL embebido.
 
 | URL | Descripción |
 |-----|-------------|
-| `http://<IP-UNRAID>:8000/static/index.html` | Aplicación |
-| `http://<IP-UNRAID>:8000/docs` | Swagger / API Docs |
+| `http://<IP-UNRAID>:<PUERTO>/` | Aplicación (redirige automáticamente al frontend) |
+| `http://<IP-UNRAID>:<PUERTO>/static/index.html` | Acceso directo al frontend |
+| `http://<IP-UNRAID>:<PUERTO>/docs` | Swagger / API Docs |
 
 ### Credenciales por defecto
 
@@ -76,89 +78,76 @@ Sistema de gestión documental de pagos sobre Docker con PostgreSQL embebido.
 
 En Unraid:
 - **Docker Plugin** instalado y activo
-- **Docker Compose Plugin** instalado (buscar "docker-compose" en Apps)
 - **Espacio en disco**: mínimo 5 GB (aplicación + documentos)
-- Acceso SSH a Unraid
+- Acceso SSH o terminal de Unraid
 
 ---
 
 ## Instalación Paso a Paso
 
+La imagen está publicada en `ghcr.io/pecha2k2/payment-gestion:latest`. No hace falta código fuente ni compilar nada en Unraid.
+
 ### 1. Crear estructura de directorios
 
 ```bash
-ssh root@<IP-UNRAID>
-
-mkdir -p /mnt/user/appdata/payment-gestion/{documents,backups,frontend/dist}
+mkdir -p /mnt/user/appdata/payment-gestion/{documents,backups}
 ```
 
-### 2. Transferir archivos
+### 2. Ejecutar el contenedor
 
-**Opción A: rsync (recomendado)**
+Config confirmada y funcionando en Unraid (hostname: Nuc, puerto 8888):
 
 ```bash
-# Desde tu máquina local
-cd /home/pecha/Antigravity/aplicación/payment-gestion
-
-rsync -av \
-  --exclude='node_modules' \
-  --exclude='.git' \
-  --exclude='postgres/data' \
-  --exclude='__pycache__' \
-  --exclude='.ruff_cache' \
-  --exclude='.atl' \
-  ./ root@<IP-UNRAID>:/mnt/user/appdata/payment-gestion/
+docker run \
+-d \
+--name='payment-gestion' \
+--net='bridge' \
+--pids-limit 2048 \
+-e TZ="Europe/Paris" \
+-e HOST_OS="Unraid" \
+-e HOST_HOSTNAME="Nuc" \
+-e HOST_CONTAINERNAME="payment-gestion" \
+-e ADMIN_PASSWORD='admin123' \
+-l net.unraid.docker.managed=dockerman \
+-p '8888:8000/tcp' \
+-v '/mnt/user/appdata/payment-gestion/documents':'/app/documents':'rw' \
+-v '/mnt/user/appdata/payment-gestion/backups':'/app/backups':'rw' \
+-v '/mnt/user/appdata/payment-gestion/postgres':'/var/lib/postgresql/data':'rw' \
+--restart unless-stopped \
+'ghcr.io/pecha2k2/payment-gestion:latest'
 ```
 
-**Opción B: Git**
+> **Producción:** cambiá `ADMIN_PASSWORD` por algo seguro antes del primer uso.
+
+> **Nota:** El frontend React va **embebido en la imagen** — no hace falta montar ningún directorio adicional para él.
+
+### 3. Verificar arranque
 
 ```bash
-cd /mnt/user/appdata/payment-gestion
-git init && git remote add origin <URL-REPO>
-git pull origin main
+docker logs payment-gestion
 ```
 
-### 3. Compilar el frontend
-
-**En tu máquina local y transferir (recomendado):**
-
-```bash
-cd /home/pecha/Antigravity/aplicación/payment-gestion/frontend
-npm install && npm run build
-
-scp -r dist/* root@<IP-UNRAID>:/mnt/user/appdata/payment-gestion/frontend/dist/
+Startup correcto se ve así:
+```
+=== Payment Gestion - Starting ===
+[1] Creating data directory...
+[2] PostgreSQL already initialized
+[3] Configuring pg_hba.conf...
+[4] Starting PostgreSQL...
+waiting for server to start.... done
+server started
+[5] Waiting for PostgreSQL...
+PostgreSQL is ready!
+[6] Ensuring database exists...
+[7] Running database migrations...
+[8] Seeding initial data...
+Database already initialized. Skipping...
+=== Starting FastAPI application ===
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000
 ```
 
-**O directamente en Unraid** (requiere Node.js instalado):
-
-```bash
-cd /mnt/user/appdata/payment-gestion/frontend
-npm install && npm run build
-```
-
-### 4. Configurar variables de entorno
-
-Editá el `docker-compose.yml` para setear al menos `ADMIN_PASSWORD`:
-
-```yaml
-environment:
-  - ADMIN_PASSWORD=tu-contraseña-segura
-  - ALLOWED_ORIGINS=http://<IP-UNRAID>:8000
-```
-
-Ver sección [Variables de Entorno](#variables-de-entorno) para la lista completa.
-
-### 5. Build e inicio
-
-```bash
-cd /mnt/user/appdata/payment-gestion
-
-# Build e inicio (las migraciones se aplican automáticamente)
-docker compose up -d --build
-
-# Ver logs (la primera vez tarda ~30-60s en inicializar PostgreSQL)
-docker compose logs -f
-```
+La aplicación estará disponible en `http://<IP-UNRAID>:8888/`
 
 ---
 
@@ -214,12 +203,11 @@ volumes:
 
 | Dato | Ubicación en host | Descripción |
 |------|-------------------|-------------|
-| Base de datos | `payment-gestion_pgdata` (volumen Docker) | Datos PostgreSQL — gestionado por Docker |
-| Documentos | `./documents` → `/app/documents` | Archivos subidos por usuarios |
-| Frontend | `./frontend/dist` → `/app/frontend` | Build de producción de React |
-| Backups | `./backups` → `/app/backups` | Backups automáticos |
+| Base de datos | `/mnt/user/appdata/payment-gestion/postgres` → `/var/lib/postgresql/data` | Datos PostgreSQL |
+| Documentos | `/mnt/user/appdata/payment-gestion/documents` → `/app/documents` | Archivos subidos por usuarios |
+| Backups | `/mnt/user/appdata/payment-gestion/backups` → `/app/backups` | Backups automáticos |
 
-> El volumen `pgdata` es gestionado por Docker y **no** requiere configuración de permisos manual.
+> El frontend React está **embebido en la imagen Docker** — no requiere volumen externo.
 
 ---
 
@@ -300,7 +288,7 @@ docker stats payment-gestion --no-stream
 - [ ] `docker ps` muestra el contenedor en `Up`
 - [ ] Logs muestran `Application startup complete`
 - [ ] Logs muestran migración Alembic aplicada o `Running upgrade ...`
-- [ ] `http://<IP-UNRAID>:8000/static/index.html` carga el frontend
+- [ ] `http://<IP-UNRAID>:8888/` carga el frontend (redirige automáticamente)
 - [ ] Login funciona con las credenciales por defecto
 
 ---
@@ -372,28 +360,27 @@ tar -xzf /path/to/backup_YYYYMMDD_HHMMSS.tar.gz \
 
 ## Actualizaciones
 
+Las actualizaciones se publican automáticamente en `ghcr.io/pecha2k2/payment-gestion:latest` vía GitHub Actions cuando se hace push a `main`.
+
 ```bash
 # 1. Backup completo antes de actualizar
 /mnt/user/appdata/payment-gestion/backup-all.sh
 
-# 2. Transferir nuevo código
-cd /home/pecha/Antigravity/aplicación/payment-gestion
-rsync -av --exclude='node_modules' --exclude='postgres/data' \
-  ./ root@<IP-UNRAID>:/mnt/user/appdata/payment-gestion/
+# 2. Bajar la nueva imagen
+docker pull ghcr.io/pecha2k2/payment-gestion:latest
 
-# 3. Compilar frontend si cambió
-cd frontend && npm install && npm run build
-scp -r dist/* root@<IP-UNRAID>:/mnt/user/appdata/payment-gestion/frontend/dist/
+# 3. Recrear el contenedor
+docker stop payment-gestion
+docker rm payment-gestion
 
-# 4. Rebuild e inicio (aplica migraciones automáticamente)
-ssh root@<IP-UNRAID>
-cd /mnt/user/appdata/payment-gestion
-docker compose down
-docker compose up -d --build
+# 4. Volver a lanzar (mismo docker run del paso de instalación)
+docker run -d --name='payment-gestion' ... ghcr.io/pecha2k2/payment-gestion:latest
 
-# 5. Verificar logs
-docker compose logs -f app
+# 5. Verificar logs (aplica migraciones automáticamente)
+docker logs payment-gestion
 ```
+
+> Desde la UI de Unraid también podés hacer click en el ícono del container → **Update**.
 
 ---
 
@@ -425,18 +412,21 @@ docker exec payment-gestion alembic history
 docker exec payment-gestion alembic stamp head
 ```
 
-### Frontend no carga
+### Frontend no carga / muestra JSON en lugar de la UI
+
+El síntoma es ver `{"message":"Payment Gestion API","version":"1.0.0"}` al acceder a `/`.
+
+Causa más común: tenés una imagen vieja (sin el frontend embebido). Solución:
 
 ```bash
-# Verificar que el build existe
-ls -la /mnt/user/appdata/payment-gestion/frontend/dist/
+docker pull ghcr.io/pecha2k2/payment-gestion:latest
+docker stop payment-gestion && docker rm payment-gestion
+# Volver a lanzar con el docker run
+```
 
-# Recompilar
-cd /home/pecha/Antigravity/aplicación/payment-gestion/frontend
-npm run build
-scp -r dist/* root@<IP-UNRAID>:/mnt/user/appdata/payment-gestion/frontend/dist/
-
-docker compose restart app
+Verificar que la imagen es nueva:
+```bash
+docker inspect ghcr.io/pecha2k2/payment-gestion:latest --format='{{.Created}}'
 ```
 
 ### Puerto 8000 ocupado
@@ -475,73 +465,40 @@ docker exec -it payment-gestion su -s /bin/bash postgres -c "psql -d payment_ges
 
 ---
 
-## Despliegue Manual sin Docker Compose
+## Configuración en UI de Unraid
 
-Si preferís configurar desde la UI de Docker de Unraid o via `docker run`:
+Para configurar desde la UI gráfica de Docker en Unraid:
 
-### Build de la imagen
+**Imagen:** `ghcr.io/pecha2k2/payment-gestion:latest`
 
-```bash
-# En Unraid
-cd /mnt/user/appdata/payment-gestion
-docker build -t payment-gestion:latest .
-
-# O exportar desde tu máquina local
-docker build -t payment-gestion:latest .
-docker save payment-gestion:latest -o payment-gestion.tar
-scp payment-gestion.tar root@<IP-UNRAID>:/tmp/
-ssh root@<IP-UNRAID> docker load -i /tmp/payment-gestion.tar
-```
-
-### Ejecutar el contenedor
-
-```bash
-docker volume create payment-gestion_pgdata
-
-docker run -d \
-  --name payment-gestion \
-  --restart unless-stopped \
-  -p 8000:8000 \
-  -e DATABASE_URL=postgresql://postgres:postgres@localhost:5432/payment_gestion \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=payment_gestion \
-  -e ADMIN_PASSWORD=cambia-esto \
-  -e ALLOWED_ORIGINS=http://<IP-UNRAID>:8000 \
-  -e DOCUMENTS_DIR=/app/documents \
-  -e STATIC_DIR=/app/frontend \
-  -e PGDATA=/var/lib/postgresql/data \
-  -v /mnt/user/appdata/payment-gestion/documents:/app/documents \
-  -v /mnt/user/appdata/payment-gestion/frontend/dist:/app/frontend \
-  -v /mnt/user/appdata/payment-gestion/backups:/app/backups \
-  -v payment-gestion_pgdata:/var/lib/postgresql/data \
-  payment-gestion:latest
-```
-
-### Configuración en UI de Unraid
-
-**Variables de entorno a definir:**
-
-| Variable | Valor |
-|----------|-------|
-| `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/payment_gestion` |
-| `POSTGRES_USER` | `postgres` |
-| `POSTGRES_PASSWORD` | `postgres` |
-| `POSTGRES_DB` | `payment_gestion` |
-| `ADMIN_PASSWORD` | `cambia-esto` |
-| `ALLOWED_ORIGINS` | `http://<IP-UNRAID>:8000` |
-| `DOCUMENTS_DIR` | `/app/documents` |
-| `STATIC_DIR` | `/app/frontend` |
-| `PGDATA` | `/var/lib/postgresql/data` |
-
-**Paths de volúmenes:**
+**Puerto:**
 
 | Host | Contenedor |
 |------|------------|
-| `/mnt/user/appdata/payment-gestion/documents` | `/app/documents` |
-| `/mnt/user/appdata/payment-gestion/frontend/dist` | `/app/frontend` |
-| `/mnt/user/appdata/payment-gestion/backups` | `/app/backups` |
-| `payment-gestion_pgdata` (Docker volume) | `/var/lib/postgresql/data` |
+| `8888` | `8000` |
+
+**Variables de entorno:**
+
+| Variable | Valor |
+|----------|-------|
+| `TZ` | `Europe/Paris` |
+| `ADMIN_PASSWORD` | `cambia-esto` |
+| `POSTGRES_USER` | `postgres` |
+| `POSTGRES_PASSWORD` | `postgres` |
+| `POSTGRES_DB` | `payment_gestion` |
+| `PGDATA` | `/var/lib/postgresql/data` |
+| `DOCUMENTS_DIR` | `/app/documents` |
+| `STATIC_DIR` | `/app/frontend` |
+
+**Paths de volúmenes:**
+
+| Host | Contenedor | Modo |
+|------|------------|------|
+| `/mnt/user/appdata/payment-gestion/documents` | `/app/documents` | rw |
+| `/mnt/user/appdata/payment-gestion/backups` | `/app/backups` | rw |
+| `/mnt/user/appdata/payment-gestion/postgres` | `/var/lib/postgresql/data` | rw |
+
+> No montar nada en `/app/frontend` — el frontend va dentro de la imagen.
 
 ---
 
@@ -579,4 +536,4 @@ docker cp ./local/archivo.pdf payment-gestion:/app/documents/
 
 ---
 
-*Versión: Payment Gestion v1.0 — Actualizado: Marzo 2026*
+*Versión: Payment Gestion v1.0 — Actualizado: Abril 2026*

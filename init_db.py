@@ -3,17 +3,24 @@
 Initialize the database with default data.
 Run this script to set up the initial database.
 """
+
 import os
 import sys
 
 # Add the app directory to path
-sys.path.insert(0, '/app')
+sys.path.insert(0, "/app")
 
 from datetime import datetime
 from app.database import SessionLocal
 from app.models.workflow import WorkflowConfig  # Import first to resolve relationships
 from app.models.user import User, UserRole
-from app.models.payment import PaymentRequest, Document, TipoPago, EstadoGeneral, DocumentoTipo
+from app.models.payment import (
+    PaymentRequest,
+    Document,
+    TipoPago,
+    EstadoGeneral,
+    DocumentoTipo,
+)
 from app.models.workflow import WorkflowState, WorkflowEstado, Area, Comment
 from app.utils.security import get_password_hash
 import json
@@ -32,13 +39,62 @@ def init_db():
 
         # Create default users
         users_data = [
-            {"username": "admin", "password": "admin123", "name": "Administrador", "email": "admin@company.com", "role": UserRole.admin, "area": "Administración"},
-            {"username": "demandante1", "password": "demo123", "name": "Juan Demandante", "email": "juan@company.com", "role": UserRole.demandante, "area": "Compras"},
-            {"username": "validador1", "password": "demo123", "name": "María Validadora", "email": "maria@company.com", "role": UserRole.validador, "area": "Presupuestos"},
-            {"username": "aprobador1", "password": "demo123", "name": "Carlos Aprobador", "email": "carlos@company.com", "role": UserRole.aprobador, "area": "Dirección"},
-            {"username": "contador1", "password": "demo123", "name": "Ana Contadora", "email": "ana@company.com", "role": UserRole.contador, "area": "Contabilidad"},
-            {"username": "pagador1", "password": "demo123", "name": "Pedro Pagador", "email": "pedro@company.com", "role": UserRole.pagador, "area": "Tesorería"},
-            {"username": "sap1", "password": "demo123", "name": "Sara SAP", "email": "sara@company.com", "role": UserRole.sap, "area": "SAP"},
+            {
+                "username": "admin",
+                "password": "admin123",
+                "name": "Administrador",
+                "email": "admin@company.com",
+                "role": UserRole.admin,
+                "area": "Administración",
+            },
+            {
+                "username": "demandante1",
+                "password": "demo123",
+                "name": "Juan Demandante",
+                "email": "juan@company.com",
+                "role": UserRole.demandante,
+                "area": "Compras",
+            },
+            {
+                "username": "validador1",
+                "password": "demo123",
+                "name": "María Validadora",
+                "email": "maria@company.com",
+                "role": UserRole.validador,
+                "area": "Presupuestos",
+            },
+            {
+                "username": "aprobador1",
+                "password": "demo123",
+                "name": "Carlos Aprobador",
+                "email": "carlos@company.com",
+                "role": UserRole.aprobador,
+                "area": "Dirección",
+            },
+            {
+                "username": "contador1",
+                "password": "demo123",
+                "name": "Ana Contadora",
+                "email": "ana@company.com",
+                "role": UserRole.contador,
+                "area": "Contabilidad",
+            },
+            {
+                "username": "pagador1",
+                "password": "demo123",
+                "name": "Pedro Pagador",
+                "email": "pedro@company.com",
+                "role": UserRole.pagador,
+                "area": "Tesorería",
+            },
+            {
+                "username": "sap1",
+                "password": "demo123",
+                "name": "Sara SAP",
+                "email": "sara@company.com",
+                "role": UserRole.sap,
+                "area": "SAP",
+            },
         ]
 
         for user_data in users_data:
@@ -50,7 +106,7 @@ def init_db():
                 role=user_data["role"],
                 area=user_data["area"],
                 active=True,
-                created_at=datetime.utcnow()
+                created_at=datetime.utcnow(),
             )
             db.add(user)
 
@@ -60,16 +116,34 @@ def init_db():
                 "nombre": "Flujo con Factura",
                 "descripcion": "Flujo estándar para pagos con factura",
                 "es_default": True,
-                "flujo_json": json.dumps(["demandante", "validadora", "aprobadora", "contabilidad", "pagadora", "sap"]),
-                "activo": True
+                "flujo_json": json.dumps(
+                    [
+                        "demandante",
+                        "validadora",
+                        "aprobadora",
+                        "contabilidad",
+                        "pagadora",
+                        "sap",
+                    ]
+                ),
+                "activo": True,
             },
             {
                 "nombre": "Flujo sin Factura",
-                "descripcion": "Flujo para pagos sin factura (aprobación y contabilidad en paralelo)",
+                "descripcion": "Flujo para pagos sin factura (validación y contabilidad en paralelo)",
                 "es_default": False,
-                "flujo_json": json.dumps(["demandante", "aprobadora", "pagadora", "validadora", "contabilidad", "sap"]),
-                "activo": True
-            }
+                "flujo_json": json.dumps(
+                    [
+                        "demandante",
+                        "aprobadora",
+                        "pagadora",
+                        "validadora",
+                        "contabilidad",
+                        "sap",
+                    ]
+                ),
+                "activo": True,
+            },
         ]
 
         for wf_data in workflows_data:
