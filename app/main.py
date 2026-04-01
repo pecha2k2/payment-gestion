@@ -1,10 +1,10 @@
 import os
 import logging
 from datetime import datetime, timezone
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, FileResponse
 
 from app.database import SessionLocal
 from app.models.user import User
@@ -54,11 +54,21 @@ if os.path.exists(STATIC_DIR):
 
 @app.get("/")
 def root():
-    # Redirect to frontend index.html
     index_path = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(index_path):
-        return RedirectResponse(url="/static/index.html")
+        return FileResponse(index_path)
     return {"message": "Payment Gestion API", "version": "1.0.0"}
+
+
+@app.get("/{full_path:path}")
+def serve_spa(full_path: str):
+    # API and static assets are handled above — serve SPA for everything else
+    if full_path.startswith(("api/", "static/", "docs", "openapi")):
+        raise HTTPException(status_code=404)
+    index_path = os.path.join(STATIC_DIR, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    raise HTTPException(status_code=404)
 
 
 @app.on_event("startup")
