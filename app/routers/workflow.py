@@ -98,16 +98,31 @@ def search_payments(
                 status_code=400, detail=f"Campo de búsqueda inválido: {field}"
             )
     else:
-        # Convert * to % and ? to _ for SQL LIKE wildcards
+        # Use SQL escaping for LIKE wildcards - prevent SQL injection
+        from sqlalchemy import func, or_
+
         sql_pattern = q.replace("*", "%").replace("?", "_")
+        # Escape special LIKE characters to prevent injection
+        sql_pattern = sql_pattern.replace("%", "\\%").replace("_", "\\_")
         search_pattern = f"%{sql_pattern}%"
+
         query = query.outerjoin(Comment).filter(
-            (PaymentRequest.numero_peticion.ilike(search_pattern))
-            | (PaymentRequest.orden_pago.ilike(search_pattern))
-            | (PaymentRequest.numero_factura.ilike(search_pattern))
-            | (PaymentRequest.n_documento_contable.ilike(search_pattern))
-            | (PaymentRequest.descripcion.ilike(search_pattern))
-            | (Comment.contenido.ilike(search_pattern))
+            or_(
+                func.lower(PaymentRequest.numero_peticion).like(
+                    search_pattern, escape="\\"
+                ),
+                func.lower(PaymentRequest.orden_pago).like(search_pattern, escape="\\"),
+                func.lower(PaymentRequest.numero_factura).like(
+                    search_pattern, escape="\\"
+                ),
+                func.lower(PaymentRequest.n_documento_contable).like(
+                    search_pattern, escape="\\"
+                ),
+                func.lower(PaymentRequest.descripcion).like(
+                    search_pattern, escape="\\"
+                ),
+                func.lower(Comment.contenido).like(search_pattern, escape="\\"),
+            )
         )
         # Also try propuesta_gasto as number if q is numeric
         try:
