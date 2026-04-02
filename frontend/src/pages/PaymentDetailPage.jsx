@@ -741,41 +741,6 @@ export default function PaymentDetailPage({ user }) {
           <div className="card">
             <h3 className="card-title">Comentarios</h3>
 
-            <div className="mb-3">
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={async () => {
-                  // Collect all documents from comments
-                  const allDocs = [];
-                  comments.forEach(comment => {
-                    if (comment.documentos) {
-                      comment.documentos.forEach(doc => allDocs.push(doc));
-                    }
-                  });
-
-                  if (allDocs.length === 0) {
-                    alert('No hay documentos adjuntos para descargar');
-                    return;
-                  }
-
-                  if (allDocs.length === 1) {
-                    // Single file: download directly
-                    handleDownloadDocument(allDocs[0].id, allDocs[0].nombre_original);
-                  } else {
-                    // Multiple files: show coming soon
-                    alert('Descarga de múltiples archivos en ZIP: preparando...');
-                    // For now, download files one by one
-                    for (const doc of allDocs) {
-                      await handleDownloadDocument(doc.id, doc.nombre_original);
-                      await new Promise(resolve => setTimeout(resolve, 500));
-                    }
-                  }
-                }}
-              >
-                📦 Descargar todos los adjuntos
-              </button>
-            </div>
-
             <div className="comments-list">
               {getAreasOrder().map(area => {
                 const areaComments = commentsByArea[area] || [];
@@ -834,6 +799,33 @@ export default function PaymentDetailPage({ user }) {
         <div className="card-header">
           <h3 className="card-title">Documentos</h3>
           <div className="flex gap-1">
+            <button
+              className="btn btn-secondary"
+              onClick={async () => {
+                // Collect all documents from payment.documents
+                const allDocs = payment.documents || [];
+
+                if (allDocs.length === 0) {
+                  alert('No hay documentos para descargar');
+                  return;
+                }
+
+                if (allDocs.length === 1) {
+                  // Single file: download directly
+                  handleDownloadDocument(allDocs[0].id, allDocs[0].nombre_original);
+                } else {
+                  // Multiple files: show coming soon
+                  alert('Descarga de múltiples archivos en ZIP: preparando...');
+                  // For now, download files one by one
+                  for (const doc of allDocs) {
+                    await handleDownloadDocument(doc.id, doc.nombre_original);
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                  }
+                }
+              }}
+            >
+              📦 Descargar todos
+            </button>
             <button className="btn btn-primary" onClick={() => setDocUploadModal(true)}>
               + Subir Documentos
             </button>
