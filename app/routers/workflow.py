@@ -1,6 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, String
 from sqlalchemy.orm import Session, selectinload
 from app.database import get_db
 from app.middleware.rate_limit import search_limits
@@ -83,37 +83,57 @@ def search_payments(
         selectinload(PaymentRequest.workflow_states)
     )
 
+    def _build_search_pattern(raw: str) -> str:
+        """Escape SQL LIKE special chars, convert user wildcards, lowercase for func.lower() match."""
+        sql_safe = raw.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        sql_pattern = sql_safe.replace("*", "%").replace("?", "_")
+        return f"%{sql_pattern.lower()}%"
+
     if field:
+        search_pattern = _build_search_pattern(q)
         if field == "propuesta_gasto":
-            try:
-                propuesta_value = int(q)
-                query = query.filter(PaymentRequest.propuesta_gasto == propuesta_value)
-            except ValueError:
-                query = query.filter(PaymentRequest.propuesta_gasto.ilike(f"%{q}%"))
+            # propuesta_gasto is an INTEGER column — cast to text for LIKE/wildcard support
+            query = query.filter(
+                func.cast(PaymentRequest.propuesta_gasto, String).like(
+                    search_pattern, escape="\\"
+                )
+            )
         elif field == "numero_peticion":
-            query = query.filter(PaymentRequest.numero_peticion.ilike(f"%{q}%"))
+            query = query.filter(
+                func.lower(PaymentRequest.numero_peticion).like(
+                    search_pattern, escape="\\"
+                )
+            )
         elif field == "orden_pago":
-            query = query.filter(PaymentRequest.orden_pago.ilike(f"%{q}%"))
+            query = query.filter(
+                func.lower(PaymentRequest.orden_pago).like(search_pattern, escape="\\")
+            )
         elif field == "numero_factura":
-            query = query.filter(PaymentRequest.numero_factura.ilike(f"%{q}%"))
+            query = query.filter(
+                func.lower(PaymentRequest.numero_factura).like(
+                    search_pattern, escape="\\"
+                )
+            )
         elif field == "n_documento_contable":
-            query = query.filter(PaymentRequest.n_documento_contable.ilike(f"%{q}%"))
+            query = query.filter(
+                func.lower(PaymentRequest.n_documento_contable).like(
+                    search_pattern, escape="\\"
+                )
+            )
         elif field == "fecha_pago":
-            query = query.filter(PaymentRequest.fecha_pago.ilike(f"%{q}%"))
+            query = query.filter(
+                func.cast(PaymentRequest.fecha_pago, String).like(
+                    search_pattern, escape="\\"
+                )
+            )
         else:
             raise HTTPException(
                 status_code=400, detail=f"Campo de búsqueda inválido: {field}"
             )
     else:
-        # A-02: Correct LIKE escape order — escape SQL special chars FIRST, then apply user wildcards.
-        # Step 1: escape SQL special chars in the raw input (prevents injection)
-        sql_safe = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        # Step 2: convert user wildcards to SQL wildcards
-        sql_pattern = sql_safe.replace("*", "%").replace("?", "_")
-        # Step 3: wrap with % for "contains" and lowercase so it matches func.lower() columns
-        search_pattern = f"%{sql_pattern.lower()}%"
+        search_pattern = _build_search_pattern(q)
 
-        # A-03: propuesta_gasto must be inside or_() — not chained as AND via .filter()
+        # A-03: propuesta_gasto inside or_() — cast INTEGER to text for wildcard support
         or_clauses = [
             func.lower(PaymentRequest.numero_peticion).like(
                 search_pattern, escape="\\"
@@ -125,14 +145,10 @@ def search_payments(
             ),
             func.lower(PaymentRequest.descripcion).like(search_pattern, escape="\\"),
             func.lower(Comment.contenido).like(search_pattern, escape="\\"),
+            func.cast(PaymentRequest.propuesta_gasto, String).like(
+                search_pattern, escape="\\"
+            ),
         ]
-
-        # Include propuesta_gasto as a numeric OR clause when q is a valid integer
-        try:
-            propuesta_value = int(q)
-            or_clauses.append(PaymentRequest.propuesta_gasto == propuesta_value)
-        except ValueError:
-            pass
 
         query = query.outerjoin(Comment).filter(or_(*or_clauses))
 
