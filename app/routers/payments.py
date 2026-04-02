@@ -304,6 +304,8 @@ def advance_workflow(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    from app.models.workflow import Comment
+
     try:
         area_enum = Area[area]
     except KeyError:
@@ -318,7 +320,24 @@ def advance_workflow(
             raise HTTPException(
                 status_code=404, detail="Estado de workflow no encontrado"
             )
-        return state
+        # Find the comment that was just created (latest for this area/payment)
+        last_comment = (
+            db.query(Comment)
+            .filter(
+                Comment.payment_request_id == payment_id,
+                Comment.area == area,
+                Comment.usuario_id == current_user.id,
+            )
+            .order_by(Comment.id.desc())
+            .first()
+        )
+        return {
+            "id": state.id,
+            "area": state.area,
+            "estado": state.estado,
+            "payment_request_id": state.payment_request_id,
+            "comment_id": last_comment.id if last_comment else None,
+        }
     except ValueError as e:
         raise HTTPException(status_code=403, detail=str(e))
 

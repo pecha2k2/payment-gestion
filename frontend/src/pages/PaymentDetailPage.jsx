@@ -296,16 +296,24 @@ export default function PaymentDetailPage({ user }) {
     }
     try {
       let comentario = actionComment;
-      // Include document filenames in comment if attached
       if (actionDocuments.length > 0) {
-        const tipos = ['peticion', 'presupuesto', 'factura', 'documento_contable', 'otro'];
-        for (const doc of actionDocuments) {
-          await api.uploadDocument(id, doc, 'otro', '');
-        }
         const names = actionDocuments.map(d => d.name).join(', ');
         comentario = `${comentario}\n[Adjuntos: ${names}]`;
       }
-      await api.advanceWorkflow(id, actionModal.area, comentario);
+      // First advance workflow (creates the comment)
+      const result = await api.advanceWorkflow(id, actionModal.area, comentario);
+      const commentId = result?.comment_id;
+      // Then upload documents linked to the comment
+      if (actionDocuments.length > 0 && commentId) {
+        for (const doc of actionDocuments) {
+          await api.uploadDocumentWithComment(id, commentId, doc, 'otro', '');
+        }
+      } else if (actionDocuments.length > 0) {
+        // Fallback: upload without comment_id
+        for (const doc of actionDocuments) {
+          await api.uploadDocument(id, doc, 'otro', '');
+        }
+      }
       setActionModal(null);
       setActionComment('');
       setActionDocuments([]);

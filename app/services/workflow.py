@@ -160,6 +160,7 @@ def advance_workflow_state(
         )
         db.add(comment)
         db.commit()
+        db.refresh(comment)
 
     # Check if all workflow states are approved -> auto-complete payment
     if state.estado == WorkflowEstado.APROBADO:
@@ -309,31 +310,51 @@ def init_default_workflow_configs(db: Session):
     """
     existing = db.query(WorkflowConfig).first()
     if not existing:
-        db.add(WorkflowConfig(
-            nombre="Flujo con Factura",
-            descripcion="Flujo estándar para pagos con factura",
-            es_default=True,
-            tipo_pago="CON_FACTURA",
-            flujo_json=json.dumps(
-                ["demandante", "validadora", "aprobadora", "contabilidad", "pagadora", "sap"]
-            ),
-            activo=True,
-        ))
-        db.add(WorkflowConfig(
-            nombre="Flujo sin Factura",
-            descripcion="Flujo para pagos sin factura",
-            es_default=False,
-            tipo_pago="SIN_FACTURA",
-            flujo_json=json.dumps(
-                ["demandante", "aprobadora", "pagadora", "validadora", "contabilidad", "sap"]
-            ),
-            activo=True,
-        ))
+        db.add(
+            WorkflowConfig(
+                nombre="Flujo con Factura",
+                descripcion="Flujo estándar para pagos con factura",
+                es_default=True,
+                tipo_pago="CON_FACTURA",
+                flujo_json=json.dumps(
+                    [
+                        "demandante",
+                        "validadora",
+                        "aprobadora",
+                        "contabilidad",
+                        "pagadora",
+                        "sap",
+                    ]
+                ),
+                activo=True,
+            )
+        )
+        db.add(
+            WorkflowConfig(
+                nombre="Flujo sin Factura",
+                descripcion="Flujo para pagos sin factura",
+                es_default=False,
+                tipo_pago="SIN_FACTURA",
+                flujo_json=json.dumps(
+                    [
+                        "demandante",
+                        "aprobadora",
+                        "pagadora",
+                        "validadora",
+                        "contabilidad",
+                        "sap",
+                    ]
+                ),
+                activo=True,
+            )
+        )
         db.commit()
         return
 
     # Backfill tipo_pago on existing configs by name convention
-    for config in db.query(WorkflowConfig).filter(WorkflowConfig.tipo_pago.is_(None)).all():
+    for config in (
+        db.query(WorkflowConfig).filter(WorkflowConfig.tipo_pago.is_(None)).all()
+    ):
         nombre_lower = config.nombre.lower()
         if "sin factura" in nombre_lower or "sin_factura" in nombre_lower:
             config.tipo_pago = "SIN_FACTURA"
