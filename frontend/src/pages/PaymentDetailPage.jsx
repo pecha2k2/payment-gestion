@@ -803,10 +803,11 @@ export default function PaymentDetailPage({ user }) {
               className="btn btn-secondary"
               onClick={async () => {
                 try {
+                  const token = localStorage.getItem('access_token');
                   const url = api.downloadAllDocuments(id);
                   const response = await fetch(url, {
                     headers: {
-                      'Authorization': `Bearer ${localStorage.getItem('token')}`
+                      'Authorization': `Bearer ${token}`
                     }
                   });
                   if (!response.ok) {
