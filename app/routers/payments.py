@@ -193,17 +193,19 @@ def delete_payment(
     if not payment:
         raise HTTPException(status_code=404, detail="Petición de pago no encontrada")
 
-    # Only creator or admin can delete
+    # Only creator or admin can delete (admin can delete any payment regardless of status)
     if payment.creadora_id != current_user.id and current_user.role.value != "admin":
         raise HTTPException(
             status_code=403, detail="No tienes permiso para eliminar esta petición"
         )
 
-    # Delete associated workflow states and comments first
+    numero_peticion = payment.numero_peticion
+
+    # Delete workflow states + their comments (no commit — part of the same transaction)
     workflow_service.delete_workflow_by_payment(db, payment_id)
 
-    # A-05: Delegate file deletion + DB cleanup to payment_service (single responsibility)
-    payment_service.delete_payment(db, payment_id)
+    # Delete documents, files, directory, and the payment itself — single atomic commit
+    payment_service.delete_payment(db, payment_id, numero_peticion)
     return {"message": "Petición eliminada"}
 
 

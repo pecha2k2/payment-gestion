@@ -369,8 +369,11 @@ def init_default_workflow_configs(db: Session):
 
 
 def delete_workflow_by_payment(db: Session, payment_id: int):
-    """Delete all workflow states and comments for a payment"""
-    # Delete comments for these workflow states
+    """Delete all workflow states and comments for a payment.
+
+    Does NOT commit — caller is responsible for the final commit.
+    This allows the entire payment deletion to be a single atomic transaction.
+    """
     states = (
         db.query(WorkflowState)
         .filter(WorkflowState.payment_request_id == payment_id)
@@ -378,8 +381,6 @@ def delete_workflow_by_payment(db: Session, payment_id: int):
     )
     for state in states:
         db.query(Comment).filter(Comment.workflow_state_id == state.id).delete()
-    # Delete workflow states
     db.query(WorkflowState).filter(
         WorkflowState.payment_request_id == payment_id
     ).delete()
-    db.commit()

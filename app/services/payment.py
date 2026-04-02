@@ -272,15 +272,24 @@ def get_payment_by_id(db: Session, payment_id: int) -> Optional[PaymentRequest]:
     )
 
 
-def delete_payment(db: Session, payment_id: int) -> None:
-    """Delete payment and all associated resources (documents, files, directory).
+def delete_payment(db: Session, payment_id: int, numero_peticion: str) -> None:
+    """Delete payment and all associated resources atomically.
 
-    Raises ValueError if payment not found.
-    The caller is responsible for permission checks before calling this function.
+    Deletes: comments → workflow states → documents (files + records) → payment folder → payment.
+    Single db.commit() at the end — must be called AFTER delete_workflow_by_payment (no-commit version).
+
+    Args:
+        db: DB session
+        payment_id: ID of the payment to delete
+        numero_peticion: needed to locate the documents directory (e.g. PAY-2026-0001)
     """
-    payment = get_payment_by_id(db, payment_id)
-    if not payment:
-        raise ValueError(f"Petición de pago {payment_id} no encontrada")
+    from app.models.workflow import Comment
+
+    # Delete any remaining comments directly linked to payment (not via workflow_state)
+    db.query(Comment).filter(
+        Comment.payment_request_id == payment_id,
+        Comment.workflow_state_id.is_(None),
+    ).delete()
 
     # Delete associated documents (physical files + DB records)
     documents = (
@@ -296,7 +305,7 @@ def delete_payment(db: Session, payment_id: int) -> None:
 
     # Delete the payment folder (e.g., PAY-2026-0001)
     documents_dir = os.getenv("DOCUMENTS_DIR", "/app/documents")
-    payment_dir = os.path.join(documents_dir, payment.numero_peticion)
+    payment_dir = os.path.join(documents_dir, numero_peticion)
     if os.path.exists(payment_dir):
         import shutil
 
@@ -305,7 +314,8 @@ def delete_payment(db: Session, payment_id: int) -> None:
         except OSError as e:
             logger.warning("Could not delete directory %s: %s", payment_dir, e)
 
-    db.delete(payment)
+    # Delete the payment record — single atomic commit covers everything
+    db.query(PaymentRequest).filter(PaymentRequest.id == payment_id).delete()
     db.commit()
 
 

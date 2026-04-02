@@ -576,9 +576,11 @@ export default function PaymentDetailPage({ user }) {
               Cancelar
             </button>
           )}
-          <button className="btn btn-danger" onClick={handleDelete}>
-            Eliminar
-          </button>
+          {(user?.role === 'admin' || (payment.creadora_id === user?.id && payment.estado_general !== 'COMPLETADA' && payment.estado_general !== 'CANCELADA')) && (
+            <button className="btn btn-danger" onClick={handleDelete}>
+              Eliminar
+            </button>
+          )}
         </div>
       </div>
 
