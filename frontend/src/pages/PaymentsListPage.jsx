@@ -385,7 +385,11 @@ export default function PaymentsListPage({ user }) {
                         })()}
                       </td>
                       <td>
-                        {pendingArea ? (
+                        {payment.estado_general === 'CANCELADA' ? (
+                          <span className="badge badge-cancelada">Cancelada</span>
+                        ) : payment.estado_general === 'COMPLETADA' ? (
+                          <span className="badge badge-completada">Completado</span>
+                        ) : pendingArea ? (
                           <span className="badge badge-en_proceso">{getAreaLabel(pendingArea)}</span>
                         ) : (
                           <span className="badge badge-completada">Completado</span>
