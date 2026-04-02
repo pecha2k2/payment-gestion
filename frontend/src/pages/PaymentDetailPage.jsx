@@ -1030,6 +1030,34 @@ export default function PaymentDetailPage({ user }) {
                 onChange={(e) => setActionComment(e.target.value)}
                 placeholder={actionModal.type === 'reverse' ? 'Escribe el motivo...' : 'Comentario...'}
               />
+              
+              {/* Preview pasted images */}
+              {actionDocuments.length > 0 && actionDocuments.some(doc => doc.type?.startsWith('image/')) && (
+                <div className="mt-3">
+                  <label className="form-label" style={{ fontSize: '0.875rem', color: '#666' }}>
+                    📷 Imágenes adjuntas (aparecerán en el comentario):
+                  </label>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {actionDocuments.filter(doc => doc.type?.startsWith('image/')).map((doc, idx) => (
+                      <div key={idx} className="relative" style={{ position: 'relative' }}>
+                        <img 
+                          src={URL.createObjectURL(doc)} 
+                          alt={doc.name}
+                          style={{ maxWidth: '120px', maxHeight: '120px', borderRadius: '4px', border: '1px solid #ddd' }}
+                        />
+                        <button 
+                          type="button"
+                          className="btn btn-danger btn-sm"
+                          onClick={() => setActionDocuments(prev => prev.filter((_, i) => i !== actionDocuments.indexOf(doc)))}
+                          style={{ position: 'absolute', top: '-5px', right: '-5px', padding: '0 4px', fontSize: '12px' }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => { setActionModal(null); setActionDocuments([]); }}>Cancelar</button>
