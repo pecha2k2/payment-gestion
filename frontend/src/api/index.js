@@ -88,7 +88,11 @@ export const api = {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${accessToken}` },
       body: formData,
-    }).then(r => r.json());
+    }).then(async (r) => {
+      const data = await r.json().catch(() => ({ detail: 'Error al subir documento' }));
+      if (!r.ok) throw new Error(data.detail || 'Error al subir documento');
+      return data;
+    });
   },
   uploadDocumentWithComment: (paymentId, commentId, file, tipo, nDocumentoContable) => {
     const formData = new FormData();
@@ -102,7 +106,11 @@ export const api = {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${accessToken}` },
       body: formData,
-    }).then(r => r.json());
+    }).then(async (r) => {
+      const data = await r.json().catch(() => ({ detail: 'Error al subir documento' }));
+      if (!r.ok) throw new Error(data.detail || 'Error al subir documento');
+      return data;
+    });
   },
   requestDocumentToken: (id) => request(`/documents/${id}/request-token`, { method: 'POST' }),
   downloadDocument: async (id) => {

@@ -36,6 +36,40 @@ from app.services import workflow as workflow_service
 router = APIRouter(prefix="/api/payments", tags=["payments"])
 
 DOCUMENTS_DIR = os.getenv("DOCUMENTS_DIR", "/app/documents")
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
+ALLOWED_MIME_TYPES = {
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "text/plain",
+    "text/csv",
+    "application/zip",
+}
+ALLOWED_EXTENSIONS = {
+    ".pdf",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".webp",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+    ".ppt",
+    ".pptx",
+    ".txt",
+    ".csv",
+    ".zip",
+}
 
 
 @router.get("", response_model=PaginatedResponse)
@@ -103,10 +137,17 @@ def update_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    payment = payment_service.update_payment(db, payment_id, payment_data)
+    payment = payment_service.get_payment_by_id(db, payment_id)
     if not payment:
         raise HTTPException(status_code=404, detail="Petición de pago no encontrada")
-    return payment
+    if payment.creadora_id != current_user.id and current_user.role.value != "admin":
+        raise HTTPException(
+            status_code=403, detail="No tienes permiso para editar esta petición"
+        )
+    updated = payment_service.update_payment(db, payment_id, payment_data)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Petición de pago no encontrada")
+    return updated
 
 
 @router.delete("/{payment_id}")
@@ -196,10 +237,28 @@ async def upload_document(
 
     # Sanitize filename to prevent path traversal attacks
     original_filename = pathlib.Path(file.filename or "unknown").name or "unknown"
+
+    ext = pathlib.Path(original_filename).suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400, detail=f"Tipo de archivo no permitido: {ext}"
+        )
+    if file.content_type and file.content_type not in ALLOWED_MIME_TYPES:
+        raise HTTPException(
+            status_code=400, detail=f"Tipo MIME no permitido: {file.content_type}"
+        )
+
     file_path = os.path.join(payment_dir, original_filename)
 
-    # Read and hash file
-    content = await file.read()
+    content = bytearray()
+    while chunk := await file.read(8192):
+        content.extend(chunk)
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"El archivo excede el límite de {MAX_FILE_SIZE // (1024 * 1024)} MB",
+            )
+    content = bytes(content)
     file_hash = hashlib.sha256(content).hexdigest()
 
     # Save file
@@ -210,7 +269,7 @@ async def upload_document(
     document = Document(
         payment_request_id=payment_id,
         tipo=tipo,
-        nombre_original=file.filename or "unknown",
+        nombre_original=original_filename,
         ruta_storage=file_path,
         hash_sha256=file_hash,
         tamano_bytes=len(content),

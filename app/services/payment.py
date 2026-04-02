@@ -50,7 +50,7 @@ def get_next_numero_peticion(db: Session) -> str:
     last_request = (
         db.query(PaymentRequest)
         .filter(PaymentRequest.numero_peticion.like(f"PAY-{year}-%"))
-        .order_by(PaymentRequest.id.desc())
+        .order_by(PaymentRequest.numero_peticion.desc())
         .first()
     )
 
@@ -70,17 +70,26 @@ def create_payment_request(
     tipo_pago_value = payment_data.tipo_pago.value
     workflow_config = (
         db.query(WorkflowConfig)
-        .filter(WorkflowConfig.tipo_pago == tipo_pago_value, WorkflowConfig.activo == True)
+        .filter(
+            WorkflowConfig.tipo_pago == tipo_pago_value, WorkflowConfig.activo == True
+        )
         .first()
     )
     if workflow_config:
         flujo = json.loads(workflow_config.flujo_json)
         workflow_config_id = workflow_config.id
-        logger.info("Using DB WorkflowConfig id=%s for tipo_pago=%s", workflow_config.id, tipo_pago_value)
+        logger.info(
+            "Using DB WorkflowConfig id=%s for tipo_pago=%s",
+            workflow_config.id,
+            tipo_pago_value,
+        )
     else:
         flujo = DEFAULT_WORKFLOWS.get(tipo_pago_value, DEFAULT_WORKFLOWS["CON_FACTURA"])
         workflow_config_id = None
-        logger.warning("No active WorkflowConfig found for tipo_pago=%s — using hardcoded default", tipo_pago_value)
+        logger.warning(
+            "No active WorkflowConfig found for tipo_pago=%s — using hardcoded default",
+            tipo_pago_value,
+        )
 
     now = datetime.now(timezone.utc)
     payment = PaymentRequest(
@@ -155,18 +164,24 @@ def _apply_payment_filters(
         )
         query = query.filter(PaymentRequest.id.in_(pending_ids))
     if numero_peticion:
-        query = query.filter(PaymentRequest.numero_peticion.ilike(f"%{numero_peticion}%"))
+        query = query.filter(
+            PaymentRequest.numero_peticion.ilike(f"%{numero_peticion}%")
+        )
     if propuesta_gasto:
         try:
             query = query.filter(PaymentRequest.propuesta_gasto == int(propuesta_gasto))
         except ValueError:
-            query = query.filter(PaymentRequest.propuesta_gasto.ilike(f"%{propuesta_gasto}%"))
+            query = query.filter(
+                PaymentRequest.propuesta_gasto.ilike(f"%{propuesta_gasto}%")
+            )
     if orden_pago:
         query = query.filter(PaymentRequest.orden_pago.ilike(f"%{orden_pago}%"))
     if numero_factura:
         query = query.filter(PaymentRequest.numero_factura.ilike(f"%{numero_factura}%"))
     if n_documento_contable:
-        query = query.filter(PaymentRequest.n_documento_contable.ilike(f"%{n_documento_contable}%"))
+        query = query.filter(
+            PaymentRequest.n_documento_contable.ilike(f"%{n_documento_contable}%")
+        )
     if fecha_pago:
         query = query.filter(PaymentRequest.fecha_pago == fecha_pago)
     return query
@@ -186,11 +201,20 @@ def get_payments(
     fecha_pago: Optional[str] = None,
 ) -> List[PaymentRequest]:
     query = _apply_payment_filters(
-        db.query(PaymentRequest), db,
-        estado_general, area, numero_peticion, propuesta_gasto,
-        orden_pago, numero_factura, n_documento_contable, fecha_pago,
+        db.query(PaymentRequest),
+        db,
+        estado_general,
+        area,
+        numero_peticion,
+        propuesta_gasto,
+        orden_pago,
+        numero_factura,
+        n_documento_contable,
+        fecha_pago,
     )
-    return query.order_by(PaymentRequest.created_at.desc()).offset(skip).limit(limit).all()
+    return (
+        query.order_by(PaymentRequest.created_at.desc()).offset(skip).limit(limit).all()
+    )
 
 
 def get_payments_paginated(
@@ -208,12 +232,21 @@ def get_payments_paginated(
 ) -> Tuple[int, List[PaymentRequest]]:
     """Returns (total_count, items) for pagination."""
     query = _apply_payment_filters(
-        db.query(PaymentRequest), db,
-        estado_general, area, numero_peticion, propuesta_gasto,
-        orden_pago, numero_factura, n_documento_contable, fecha_pago,
+        db.query(PaymentRequest),
+        db,
+        estado_general,
+        area,
+        numero_peticion,
+        propuesta_gasto,
+        orden_pago,
+        numero_factura,
+        n_documento_contable,
+        fecha_pago,
     )
     total = query.count()
-    items = query.order_by(PaymentRequest.created_at.desc()).offset(skip).limit(limit).all()
+    items = (
+        query.order_by(PaymentRequest.created_at.desc()).offset(skip).limit(limit).all()
+    )
     return total, items
 
 

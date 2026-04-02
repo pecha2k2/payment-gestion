@@ -62,6 +62,11 @@ app = FastAPI(
 _origins_env = os.getenv("ALLOWED_ORIGINS", "")
 ALLOWED_ORIGINS = [o.strip() for o in _origins_env.split(",") if o.strip()] or ["*"]
 
+if ALLOWED_ORIGINS == ["*"]:
+    logger.warning(
+        "CORS: allow_origins=['*'] con credentials=True. Configurar ALLOWED_ORIGINS en producción."
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -103,5 +108,3 @@ def serve_spa(full_path: str):
     if os.path.exists(index_path):
         return FileResponse(index_path)
     raise HTTPException(status_code=404)
-
-

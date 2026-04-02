@@ -11,7 +11,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from app.database import Base
-from datetime import datetime
+from datetime import datetime, timezone
 import enum
 
 
@@ -75,7 +75,9 @@ class PaymentRequest(Base):
         Integer, ForeignKey("workflow_configs.id"), nullable=True
     )
     created_at = Column(DateTime, default=None)
-    updated_at = Column(DateTime, default=None, onupdate=datetime.utcnow)
+    updated_at = Column(
+        DateTime, default=None, onupdate=lambda: datetime.now(timezone.utc)
+    )
 
     # Relationships
     creadora = relationship("User", back_populates="payment_requests")

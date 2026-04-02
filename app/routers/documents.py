@@ -1,12 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+from urllib.parse import quote
 from app.database import get_db
 from app.models.user import User
 from app.models.payment import Document
 from app.services.auth import get_current_user
 from app.utils.security import create_document_token, decode_document_token
 import os
+
+
+def _safe_content_disposition(disposition: str, filename: str) -> str:
+    safe = filename.replace('"', "_").replace("\n", "_").replace("\r", "_")
+    encoded = quote(filename, safe="")
+    return f"{disposition}; filename=\"{safe}\"; filename*=UTF-8''{encoded}"
+
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -31,7 +39,9 @@ def download_document(
         filename=document.nombre_original,
         media_type="application/octet-stream",
         headers={
-            "Content-Disposition": f'attachment; filename="{document.nombre_original}"',
+            "Content-Disposition": _safe_content_disposition(
+                "attachment", document.nombre_original
+            ),
             "Content-Transfer-Encoding": "binary",
         },
     )
@@ -77,7 +87,9 @@ def public_view_document(
         path=document.ruta_storage,
         media_type=document.mime_type or "application/octet-stream",
         headers={
-            "Content-Disposition": f'inline; filename="{document.nombre_original}"'
+            "Content-Disposition": _safe_content_disposition(
+                "inline", document.nombre_original
+            )
         },
     )
 
@@ -109,7 +121,9 @@ def public_download_document(
         filename=document.nombre_original,
         media_type="application/octet-stream",
         headers={
-            "Content-Disposition": f'attachment; filename="{document.nombre_original}"',
+            "Content-Disposition": _safe_content_disposition(
+                "attachment", document.nombre_original
+            ),
             "Content-Transfer-Encoding": "binary",
         },
     )

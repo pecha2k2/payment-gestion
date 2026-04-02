@@ -14,7 +14,6 @@ class DocumentResponse(DocumentBase):
     id: int
     payment_request_id: int
     nombre_original: str
-    ruta_storage: str
     hash_sha256: Optional[str] = None
     tamano_bytes: int
     mime_type: Optional[str] = None
@@ -78,7 +77,6 @@ class PaymentRequestUpdate(BaseModel):
     monto_total: Optional[Decimal] = None
     divisa: Optional[Divisa] = None
     descripcion: Optional[str] = None
-    estado_general: Optional[EstadoGeneral] = None
     banco: Optional[str] = None
 
     @field_validator("fecha_pago", mode="before")

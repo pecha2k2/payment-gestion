@@ -10,7 +10,7 @@ import sys
 # Add the app directory to path
 sys.path.insert(0, "/app")
 
-from datetime import datetime
+from datetime import datetime, timezone
 from app.database import SessionLocal
 from app.models.workflow import WorkflowConfig  # Import first to resolve relationships
 from app.models.user import User, UserRole
@@ -106,7 +106,7 @@ def init_db():
                 role=user_data["role"],
                 area=user_data["area"],
                 active=True,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
             )
             db.add(user)
 

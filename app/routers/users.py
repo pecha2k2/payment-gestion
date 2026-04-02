@@ -15,7 +15,7 @@ def list_users(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_admin),
 ):
     users = db.query(User).offset(skip).limit(limit).all()
     return users
@@ -25,7 +25,7 @@ def list_users(
 def create_user(
     user_data: UserCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_admin),
 ):
     # Check if username exists
     existing = db.query(User).filter(User.username == user_data.username).first()
@@ -39,7 +39,7 @@ def create_user(
         email=user_data.email,
         role=user_data.role,
         area=user_data.area,
-        active=True
+        active=True,
     )
     db.add(user)
     db.commit()
@@ -52,7 +52,7 @@ def update_user(
     user_id: int,
     user_data: UserUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_admin),
 ):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -71,7 +71,7 @@ def update_user(
 def delete_user(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_admin),
 ):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -80,7 +80,6 @@ def delete_user(
     if user.id == current_user.id:
         raise HTTPException(status_code=400, detail="No puedes eliminarte a ti mismo")
 
-    # Delete user permanently
-    db.delete(user)
+    user.active = False
     db.commit()
-    return {"message": "Usuario eliminado correctamente"}
+    return {"message": "Usuario desactivado correctamente"}
