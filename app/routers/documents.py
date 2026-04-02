@@ -1,13 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from urllib.parse import quote
 from app.database import get_db
 from app.models.user import User
-from app.models.payment import Document
+from app.models.payment import Document, PaymentRequest
 from app.services.auth import get_current_user
 from app.utils.security import create_document_token, decode_document_token
 import os
+import zipfile
+import io
 
 
 def _safe_content_disposition(disposition: str, filename: str) -> str:
@@ -156,3 +158,42 @@ def delete_document(
     db.commit()
 
     return {"message": "Documento eliminado"}
+
+
+@router.get("/payment/{payment_id}/download-all")
+def download_all_documents(
+    payment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Descargar todos los documentos de un pago como ZIP."""
+    # Get payment and documents
+    payment = db.query(PaymentRequest).filter(PaymentRequest.id == payment_id).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Pago no encontrado")
+
+    documents = (
+        db.query(Document).filter(Document.payment_request_id == payment_id).all()
+    )
+    if not documents:
+        raise HTTPException(status_code=404, detail="No hay documentos para descargar")
+
+    # Create ZIP in memory
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for doc in documents:
+            if os.path.exists(doc.ruta_storage):
+                # Add file to ZIP with original filename
+                zip_file.write(doc.ruta_storage, doc.nombre_original)
+
+    # Prepare response
+    zip_buffer.seek(0)
+    zip_filename = f"documentos_{payment.numero_peticion}.zip"
+
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": _safe_content_disposition("attachment", zip_filename)
+        },
+    )

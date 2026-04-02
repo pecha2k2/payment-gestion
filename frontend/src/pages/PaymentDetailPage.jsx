@@ -802,25 +802,29 @@ export default function PaymentDetailPage({ user }) {
             <button
               className="btn btn-secondary"
               onClick={async () => {
-                // Collect all documents from payment.documents
-                const allDocs = payment.documents || [];
-
-                if (allDocs.length === 0) {
-                  alert('No hay documentos para descargar');
-                  return;
-                }
-
-                if (allDocs.length === 1) {
-                  // Single file: download directly
-                  handleDownloadDocument(allDocs[0].id, allDocs[0].nombre_original);
-                } else {
-                  // Multiple files: show coming soon
-                  alert('Descarga de múltiples archivos en ZIP: preparando...');
-                  // For now, download files one by one
-                  for (const doc of allDocs) {
-                    await handleDownloadDocument(doc.id, doc.nombre_original);
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                try {
+                  const url = api.downloadAllDocuments(id);
+                  const response = await fetch(url, {
+                    headers: {
+                      'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                  });
+                  if (!response.ok) {
+                    const error = await response.json().catch(() => ({}));
+                    throw new Error(error.detail || 'Error al descargar ZIP');
                   }
+                  const blob = await response.blob();
+                  const blobUrl = window.URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = blobUrl;
+                  link.download = `documentos_${payment.numero_peticion}.zip`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  window.URL.revokeObjectURL(blobUrl);
+                } catch (err) {
+                  console.error('Error descargando ZIP:', err);
+                  alert(err.message || 'Error al descargar el archivo ZIP');
                 }
               }}
             >

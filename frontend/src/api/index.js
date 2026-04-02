@@ -122,6 +122,10 @@ export const api = {
     return `${API_BASE}/documents/public/${id}/view?token=${token}`;
   },
   deleteDocument: (id) => request(`/documents/${id}`, { method: 'DELETE' }),
+  downloadAllDocuments: (paymentId) => {
+    // Returns URL to download ZIP of all documents for a payment
+    return `${API_BASE}/documents/payment/${paymentId}/download-all`;
+  },
 
   // Workflow
   advanceWorkflow: (paymentId, area, comentario) =>
