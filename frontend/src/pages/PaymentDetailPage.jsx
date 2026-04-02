@@ -882,6 +882,8 @@ export default function PaymentDetailPage({ user }) {
           </div>
         </div>
       </div>
+
+      {/* Documents section - outside 3-column layout */}
       <div className="card mt-3">
         <div className="card-header">
           <h3 className="card-title">Documentos</h3>
@@ -1068,4 +1070,3 @@ export default function PaymentDetailPage({ user }) {
     </div>
   );
 }
-// force rebuild
