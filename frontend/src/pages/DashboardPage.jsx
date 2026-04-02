@@ -4,10 +4,10 @@ import { api } from '../api';
 
 const AREAS_ORDER = ['demandante', 'validadora', 'aprobadora', 'contabilidad', 'pagadora', 'sap'];
 
-// Helper function to determine next action
-const getNextAction = (payment) => {
-  if (payment.estado_general === 'COMPLETADA') return 'Completada';
-  if (payment.estado_general === 'CANCELADA') return 'Cancelada';
+// Helper function to determine next action - returns area and display info
+const getNextActionInfo = (payment) => {
+  if (payment.estado_general === 'COMPLETADA') return { type: 'completada', area: null };
+  if (payment.estado_general === 'CANCELADA') return { type: 'cancelada', area: null };
   
   // Find first pending area in workflow order
   const workflowOrder = payment.tipo_pago === 'CON_FACTURA' 
@@ -18,20 +18,12 @@ const getNextAction = (payment) => {
     for (const area of workflowOrder) {
       const state = payment.workflow_states.find(ws => ws.area === area);
       if (state && state.estado === 'PENDIENTE') {
-        const areaNames = {
-          demandante: 'Demandante',
-          validadora: 'Validadora',
-          aprobadora: 'Aprobadora',
-          contabilidad: 'Contabilidad',
-          pagadora: 'Pagadora',
-          sap: 'SAP'
-        };
-        return areaNames[area];
+        return { type: 'pendiente', area };
       }
     }
   }
   
-  return 'En proceso';
+  return { type: 'en_proceso', area: null };
 };
 
 // Format number with Spanish thousands separator
@@ -293,7 +285,22 @@ export default function DashboardPage({ user }) {
                     <td><span className={`badge badge-${payment.estado_general.toLowerCase()}`}>
                       {payment.estado_general}
                     </span></td>
-                    <td>{getNextAction(payment)}</td>
+                    <td>
+                      {(() => {
+                        const nextInfo = getNextActionInfo(payment);
+                        if (nextInfo.type === 'completada') {
+                          return <span className="badge badge-completada">Completada</span>;
+                        } else if (nextInfo.type === 'cancelada') {
+                          return <span className="badge badge-cancelada">Cancelada</span>;
+                        } else if (nextInfo.type === 'pendiente') {
+                          const areaName = AREAS_DISPLAY[nextInfo.area];
+                          const areaIcon = AREA_ICONS[nextInfo.area];
+                          return <span className="badge badge-en_proceso">{areaIcon} {areaName}</span>;
+                        } else {
+                          return <span className="badge badge-abierta">En proceso</span>;
+                        }
+                      })()}
+                    </td>
                     <td>{formatCurrency(payment.monto_total, payment.divisa)}</td>
                   </tr>
                 ))}
