@@ -55,7 +55,7 @@ def get_area_dependencies(db: Session, payment_id: int) -> dict:
         return AREA_DEPENDENCIES
 
     try:
-        areas = json.loads(config.flujo_json)
+        areas = config.flujo_json if not isinstance(config.flujo_json, str) else json.loads(config.flujo_json)
     except (json.JSONDecodeError, TypeError):
         return AREA_DEPENDENCIES
 

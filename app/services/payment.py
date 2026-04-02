@@ -76,7 +76,7 @@ def create_payment_request(
         .first()
     )
     if workflow_config:
-        flujo = json.loads(workflow_config.flujo_json)
+        flujo = workflow_config.flujo_json if not isinstance(workflow_config.flujo_json, str) else json.loads(workflow_config.flujo_json)
         workflow_config_id = workflow_config.id
         logger.info(
             "Using DB WorkflowConfig id=%s for tipo_pago=%s",

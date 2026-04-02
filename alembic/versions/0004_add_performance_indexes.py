@@ -62,11 +62,6 @@ def upgrade() -> None:
         unique=False,
     )
 
-    # Add constraints — NOT VALID to avoid breaking existing rows with monto_total=0
-    op.execute(
-        "ALTER TABLE payment_requests ADD CONSTRAINT ck_payment_requests_monto_positive "
-        "CHECK (monto_total > 0) NOT VALID"
-    )
 
     # Convert TEXT to JSONB for better performance
     op.execute("""
@@ -85,11 +80,6 @@ def downgrade() -> None:
     op.drop_index("ix_payment_requests_creadora_id", table_name="payment_requests")
     op.drop_index("ix_payment_requests_estado", table_name="payment_requests")
     op.drop_index("ix_documents_payment_id", table_name="documents")
-
-    # Drop constraints
-    op.drop_constraint(
-        "ck_payment_requests_monto_positive", table_name="payment_requests"
-    )
 
     # Revert JSONB to TEXT
     op.execute("""
