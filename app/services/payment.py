@@ -230,9 +230,14 @@ def get_payments_paginated(
     n_documento_contable: Optional[str] = None,
     fecha_pago: Optional[str] = None,
 ) -> Tuple[int, List[PaymentRequest]]:
-    """Returns (total_count, items) for pagination."""
+    """Returns (total_count, items) for pagination with workflow states."""
+    # Base query with eager loading of workflow_states
+    base_query = db.query(PaymentRequest).options(
+        selectinload(PaymentRequest.workflow_states)
+    )
+
     query = _apply_payment_filters(
-        db.query(PaymentRequest),
+        base_query,
         db,
         estado_general,
         area,

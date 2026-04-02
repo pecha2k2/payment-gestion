@@ -101,6 +101,7 @@ class PaymentRequestResponse(PaymentRequestBase):
     workflow_config_id: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    workflow_states: List["WorkflowStateResponse"] = []
 
     class Config:
         from_attributes = True
@@ -128,4 +129,5 @@ class PaymentRequestDetail(PaymentRequestResponse):
 from app.schemas.user import UserResponse
 from app.schemas.workflow import WorkflowStateResponse, CommentResponse
 
+PaymentRequestResponse.model_rebuild()
 PaymentRequestDetail.model_rebuild()
