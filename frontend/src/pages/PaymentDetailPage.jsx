@@ -441,6 +441,20 @@ export default function PaymentDetailPage({ user }) {
         <h1 style={{ color: '#fbbf24' }}>{payment.numero_peticion}</h1>
         <div className="flex gap-1">
           {(() => {
+            if (payment.estado_general === 'CANCELADA') {
+              return (
+                <span className="badge badge-cancelada" style={{ alignSelf: 'center' }}>
+                  CANCELADA
+                </span>
+              );
+            }
+            if (payment.estado_general === 'COMPLETADA') {
+              return (
+                <span className="badge badge-completada" style={{ alignSelf: 'center' }}>
+                  COMPLETADA
+                </span>
+              );
+            }
             const nextPending = sortedWorkflowStates.find(s => s.estado === 'PENDIENTE');
             if (nextPending) {
               return (
