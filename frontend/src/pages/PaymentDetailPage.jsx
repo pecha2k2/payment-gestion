@@ -158,13 +158,18 @@ function CommentImagePreview({ doc, onDownload }) {
   const [imageUrl, setImageUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   useEffect(() => {
     const loadImage = async () => {
       try {
-        // Use the public endpoint with token
-        const response = await api.viewDocument(doc.id);
-        setImageUrl(response);
+        // Get ephemeral token for document
+        const { token } = await api.requestDocumentToken(doc.id);
+        // Fetch image as blob
+        const response = await fetch(`/api/documents/public/${doc.id}/view?token=${token}`);
+        if (!response.ok) throw new Error('Failed to load image');
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        setImageUrl(url);
       } catch (err) {
         console.error('Error loading image:', err);
         setError(err.message || 'Error cargando imagen');
@@ -173,15 +178,19 @@ function CommentImagePreview({ doc, onDownload }) {
       }
     };
     loadImage();
+    
+    return () => {
+      if (imageUrl) URL.revokeObjectURL(imageUrl);
+    };
   }, [doc.id]);
-  
+
   if (loading) return <span style={{ fontSize: '0.75rem', color: '#999' }}>Cargando imagen...</span>;
   if (error) return <span style={{ fontSize: '0.75rem', color: '#c00' }}>{error}</span>;
   if (!imageUrl) return <span style={{ fontSize: '0.75rem', color: '#999' }}>Error cargando imagen</span>;
-  
+
   return (
     <div style={{ display: 'inline-block' }}>
-      <img 
+      <img
         src={imageUrl}
         alt={doc.nombre_original}
         style={{ maxWidth: '200px', maxHeight: '200px', borderRadius: '4px', border: '1px solid #ddd', cursor: 'pointer' }}
