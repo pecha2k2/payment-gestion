@@ -106,10 +106,12 @@ def search_payments(
             )
     else:
         # A-02: Correct LIKE escape order — escape SQL special chars FIRST, then apply user wildcards.
-        # Previous code did the opposite: converted * → % then escaped %, destroying the wildcards.
+        # Step 1: escape SQL special chars in the raw input (prevents injection)
         sql_safe = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        # Step 2: convert user wildcards to SQL wildcards
         sql_pattern = sql_safe.replace("*", "%").replace("?", "_")
-        search_pattern = f"%{sql_pattern}%"
+        # Step 3: wrap with % for "contains" and lowercase so it matches func.lower() columns
+        search_pattern = f"%{sql_pattern.lower()}%"
 
         # A-03: propuesta_gasto must be inside or_() — not chained as AND via .filter()
         or_clauses = [
