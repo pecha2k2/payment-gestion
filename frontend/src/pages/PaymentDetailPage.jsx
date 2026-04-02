@@ -157,33 +157,26 @@ const formatDate = (dateStr, showTime = true) => {
 function CommentImagePreview({ doc, onDownload }) {
   const [imageUrl, setImageUrl] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
   useEffect(() => {
     const loadImage = async () => {
       try {
-        const token = localStorage.getItem('access_token');
-        const response = await fetch(`/api/documents/${doc.id}/download`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (response.ok) {
-          const blob = await response.blob();
-          const url = URL.createObjectURL(blob);
-          setImageUrl(url);
-        }
+        // Use the public endpoint with token
+        const response = await api.viewDocument(doc.id);
+        setImageUrl(response);
       } catch (err) {
         console.error('Error loading image:', err);
+        setError(err.message || 'Error cargando imagen');
       } finally {
         setLoading(false);
       }
     };
     loadImage();
-    
-    return () => {
-      if (imageUrl) URL.revokeObjectURL(imageUrl);
-    };
   }, [doc.id]);
   
   if (loading) return <span style={{ fontSize: '0.75rem', color: '#999' }}>Cargando imagen...</span>;
+  if (error) return <span style={{ fontSize: '0.75rem', color: '#c00' }}>{error}</span>;
   if (!imageUrl) return <span style={{ fontSize: '0.75rem', color: '#999' }}>Error cargando imagen</span>;
   
   return (
@@ -1004,7 +997,15 @@ export default function PaymentDetailPage({ user }) {
 
       {/* Action Modal */}
       {actionModal && (
-        <div className="modal-overlay">
+        <div 
+          className="modal-overlay"
+          onPaste={(e) => {
+            // Global paste handler for the entire modal
+            if (actionModal.type === 'advance') {
+              handleClipboardPaste(e, (file) => setActionDocuments(prev => [...prev, file]));
+            }
+          }}
+        >
           <div className="modal">
             <div className="modal-header">
               <h3 className="modal-title">
@@ -1035,12 +1036,14 @@ export default function PaymentDetailPage({ user }) {
                     }
                     if (validFiles.length > 0) setActionDocuments(prev => [...prev, ...validFiles]);
                   }}
-                  onPaste={(e) => handleClipboardPaste(e, (file) => setActionDocuments(prev => [...prev, file]))}
                   style={{ padding: '1rem', fontSize: '0.875rem' }}
                 >
-                  <p>Arrastra archivos aquí o haz clic para seleccionar</p>
-                  <p style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.5rem' }}>
-                    💡 También puedes pegar una imagen (Ctrl+V)
+                  <p style={{ margin: '0', fontWeight: 'bold' }}>📎 Adjuntar archivos</p>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#666' }}>
+                    Arrastra aquí o haz clic para seleccionar
+                  </p>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#999' }}>
+                    También puedes pegar (Ctrl+V) en cualquier parte de esta ventana
                   </p>
                 </div>
                 <input
