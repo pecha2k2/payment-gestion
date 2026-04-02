@@ -62,11 +62,10 @@ def upgrade() -> None:
         unique=False,
     )
 
-    # Add constraints
-    op.create_check_constraint(
-        "ck_payment_requests_monto_positive",
-        "payment_requests",
-        "monto_total > 0",
+    # Add constraints — NOT VALID to avoid breaking existing rows with monto_total=0
+    op.execute(
+        "ALTER TABLE payment_requests ADD CONSTRAINT ck_payment_requests_monto_positive "
+        "CHECK (monto_total > 0) NOT VALID"
     )
 
     # Convert TEXT to JSONB for better performance
