@@ -466,272 +466,385 @@ export default function PaymentDetailPage({ user }) {
         </div>
       </div>
 
-      <div className="form-row">
-        <div className="card flex-1">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="card-title">Información de la Petición</h3>
-            {!editingPayment && payment.estado_general !== 'COMPLETADA' && payment.estado_general !== 'CANCELADA' && (
-              <button className="btn btn-secondary" onClick={handleEditPayment}>Editar</button>
-            )}
-          </div>
-          {!editingPayment && (
-            <div className="payment-info-grid">
-              <div className="payment-info-item">
-                <div className="payment-info-label">Código Propuesta de Gasto</div>
-                <div className="payment-info-value">{payment.propuesta_gasto || '-'}</div>
-              </div>
-              <div className="payment-info-item">
-                <div className="payment-info-label">Orden de Pago</div>
-                <div className="payment-info-value">{payment.orden_pago || '-'}</div>
-              </div>
-              <div className="payment-info-item">
-                <div className="payment-info-label">Nº Documento Contable</div>
-                <div className="payment-info-value">{payment.n_documento_contable || '-'}</div>
-              </div>
-              <div className="payment-info-item">
-                <div className="payment-info-label">Número de Factura</div>
-                <div className="payment-info-value">{payment.numero_factura || '-'}</div>
-              </div>
-              <div className="payment-info-item">
-                <div className="payment-info-label">Tipo de Pago</div>
-                <div className="payment-info-value">{getTipoPagoStr(payment.tipo_pago) === 'SIN_FACTURA' ? 'Sin Factura' : 'Con Factura'}</div>
-              </div>
-              <div className="payment-info-item highlight">
-                <div className="payment-info-label">Fecha de Pago</div>
-                <div className="payment-info-value">{formatDate(payment.fecha_pago, false)}</div>
-              </div>
-              <div className="payment-info-item">
-                <div className="payment-info-label">Banco</div>
-                <div className="payment-info-value">{payment.banco || '-'}</div>
-              </div>
-              <div className="payment-info-item">
-                <div className="payment-info-label">Medio de Pago</div>
-                <div className="payment-info-value">{getMedioPagoDisplay(payment.medio_pago) || '-'}</div>
-              </div>
-              <div className="payment-info-item highlight">
-                <div className="payment-info-label">Monto Total</div>
-                <div className="payment-info-value" style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary)' }}>
-                  {formatCurrency(payment.monto_total, payment.divisa)}
+      <div className="three-column-layout">
+        {/* Column 1: Información de la Petición */}
+        <div className="info-column">
+          <div className="card">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="card-title">Información de la Petición</h3>
+              {!editingPayment && payment.estado_general !== 'COMPLETADA' && payment.estado_general !== 'CANCELADA' && (
+                <button className="btn btn-secondary" onClick={handleEditPayment}>Editar</button>
+              )}
+            </div>
+            {!editingPayment && (
+              <div className="payment-info-grid">
+                <div className="payment-info-item">
+                  <div className="payment-info-label">Código Propuesta de Gasto</div>
+                  <div className="payment-info-value">{payment.propuesta_gasto || '-'}</div>
+                </div>
+                <div className="payment-info-item">
+                  <div className="payment-info-label">Orden de Pago</div>
+                  <div className="payment-info-value">{payment.orden_pago || '-'}</div>
+                </div>
+                <div className="payment-info-item">
+                  <div className="payment-info-label">Nº Documento Contable</div>
+                  <div className="payment-info-value">{payment.n_documento_contable || '-'}</div>
+                </div>
+                <div className="payment-info-item">
+                  <div className="payment-info-label">Número de Factura</div>
+                  <div className="payment-info-value">{payment.numero_factura || '-'}</div>
+                </div>
+                <div className="payment-info-item">
+                  <div className="payment-info-label">Tipo de Pago</div>
+                  <div className="payment-info-value">{getTipoPagoStr(payment.tipo_pago) === 'SIN_FACTURA' ? 'Sin Factura' : 'Con Factura'}</div>
+                </div>
+                <div className="payment-info-item highlight">
+                  <div className="payment-info-label">Fecha de Pago</div>
+                  <div className="payment-info-value">{formatDate(payment.fecha_pago, false)}</div>
+                </div>
+                <div className="payment-info-item">
+                  <div className="payment-info-label">Banco</div>
+                  <div className="payment-info-value">{payment.banco || '-'}</div>
+                </div>
+                <div className="payment-info-item">
+                  <div className="payment-info-label">Medio de Pago</div>
+                  <div className="payment-info-value">{getMedioPagoDisplay(payment.medio_pago) || '-'}</div>
+                </div>
+                <div className="payment-info-item highlight">
+                  <div className="payment-info-label">Monto Total</div>
+                  <div className="payment-info-value" style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary)' }}>
+                    {formatCurrency(payment.monto_total, payment.divisa)}
+                  </div>
+                </div>
+                <div className="payment-info-item" style={{ gridColumn: '1 / -1' }}>
+                  <div className="payment-info-label">Descripción del Gasto</div>
+                  <div className="payment-info-value">{payment.descripcion || '-'}</div>
                 </div>
               </div>
-              <div className="payment-info-item" style={{ gridColumn: '1 / -1' }}>
-                <div className="payment-info-label">Descripción del Gasto</div>
-                <div className="payment-info-value">{payment.descripcion || '-'}</div>
+            )}
+            {editingPayment ? (
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Código Propuesta de Gasto</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={editForm.propuesta_gasto}
+                    onChange={(e) => setEditForm({...editForm, propuesta_gasto: e.target.value})}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Orden de Pago</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={editForm.orden_pago}
+                    onChange={(e) => setEditForm({...editForm, orden_pago: e.target.value})}
+                  />
+                </div>
               </div>
-            </div>
-          )}
-          {editingPayment ? (
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Código Propuesta de Gasto</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={editForm.propuesta_gasto}
-                  onChange={(e) => setEditForm({...editForm, propuesta_gasto: e.target.value})}
-                />
+            ) : null}
+            {editingPayment ? (
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Número de Factura</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={editForm.numero_factura}
+                    onChange={(e) => setEditForm({...editForm, numero_factura: e.target.value})}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Nº Documento Contable</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={editForm.n_documento_contable}
+                    onChange={(e) => setEditForm({...editForm, n_documento_contable: e.target.value})}
+                  />
+                </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">Orden de Pago</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={editForm.orden_pago}
-                  onChange={(e) => setEditForm({...editForm, orden_pago: e.target.value})}
-                />
+            ) : null}
+            {editingPayment ? (
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Tipo de Pago</label>
+                  <select
+                    className="form-select"
+                    value={editForm.tipo_pago}
+                    onChange={(e) => setEditForm({...editForm, tipo_pago: e.target.value})}
+                  >
+                    <option value="CON_FACTURA">Con Factura</option>
+                    <option value="SIN_FACTURA">Sin Factura</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Fecha de Pago (dd/mm/yyyy)</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="dd/mm/yyyy"
+                    value={editForm.fecha_pago}
+                    onChange={(e) => setEditForm({...editForm, fecha_pago: e.target.value})}
+                  />
+                </div>
               </div>
-            </div>
-          ) : null}
-          {editingPayment ? (
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Número de Factura</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={editForm.numero_factura}
-                  onChange={(e) => setEditForm({...editForm, numero_factura: e.target.value})}
-                />
+            ) : null}
+            {editingPayment ? (
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Banco</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={editForm.banco}
+                    onChange={(e) => setEditForm({...editForm, banco: e.target.value})}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Medio de Pago</label>
+                  <select
+                    className="form-select"
+                    value={editForm.medio_pago}
+                    onChange={(e) => setEditForm({...editForm, medio_pago: e.target.value})}
+                  >
+                    <option value="">Seleccionar...</option>
+                    <option value="TRANSFERENCIA">Transferencia</option>
+                    <option value="TARJETA">Tarjeta</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Monto Total</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="form-input"
+                    value={editForm.monto_total}
+                    onChange={(e) => setEditForm({...editForm, monto_total: e.target.value})}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Divisa</label>
+                  <select
+                    className="form-select"
+                    value={editForm.divisa}
+                    onChange={(e) => setEditForm({...editForm, divisa: e.target.value})}
+                  >
+                    <option value="EUR">EUR (€)</option>
+                    <option value="USD">USD ($)</option>
+                    <option value="GBP">GBP (£)</option>
+                    <option value="CHF">CHF (Fr)</option>
+                    <option value="JPY">JPY (¥)</option>
+                    <option value="CNY">CNY (¥)</option>
+                  </select>
+                </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">Nº Documento Contable</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={editForm.n_documento_contable}
-                  onChange={(e) => setEditForm({...editForm, n_documento_contable: e.target.value})}
-                />
+            ) : (
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Banco</label>
+                  <p>{payment.banco || '-'}</p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Medio de Pago</label>
+                  <p>{getMedioPagoDisplay(payment.medio_pago)}</p>
+                </div>
               </div>
-            </div>
-          ) : null}
-          {editingPayment ? (
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Tipo de Pago</label>
-                <select
-                  className="form-select"
-                  value={editForm.tipo_pago}
-                  onChange={(e) => setEditForm({...editForm, tipo_pago: e.target.value})}
-                >
-                  <option value="CON_FACTURA">Con Factura</option>
-                  <option value="SIN_FACTURA">Sin Factura</option>
-                </select>
+            )}
+            {editingPayment && (
+              <div className="form-row">
+                <div className="form-group" style={{ width: '100%' }}>
+                  <label className="form-label">Descripción del Gasto</label>
+                  <textarea
+                    className="form-textarea"
+                    value={editForm.descripcion}
+                    onChange={(e) => setEditForm({...editForm, descripcion: e.target.value})}
+                  />
+                </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">Fecha de Pago (dd/mm/yyyy)</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="dd/mm/yyyy"
-                  value={editForm.fecha_pago}
-                  onChange={(e) => setEditForm({...editForm, fecha_pago: e.target.value})}
-                />
+            )}
+            {editingPayment && (
+              <div className="flex gap-1 mt-3">
+                <button className="btn btn-primary" onClick={handleSaveEdit}>Guardar</button>
+                <button className="btn btn-warning" onClick={handleCancelEdit}>Cancelar</button>
               </div>
-            </div>
-          ) : null}
-          {editingPayment ? (
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Banco</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={editForm.banco}
-                  onChange={(e) => setEditForm({...editForm, banco: e.target.value})}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Medio de Pago</label>
-                <select
-                  className="form-select"
-                  value={editForm.medio_pago}
-                  onChange={(e) => setEditForm({...editForm, medio_pago: e.target.value})}
-                >
-                  <option value="">Seleccionar...</option>
-                  <option value="TRANSFERENCIA">Transferencia</option>
-                  <option value="TARJETA">Tarjeta</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Monto Total</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="form-input"
-                  value={editForm.monto_total}
-                  onChange={(e) => setEditForm({...editForm, monto_total: e.target.value})}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Divisa</label>
-                <select
-                  className="form-select"
-                  value={editForm.divisa}
-                  onChange={(e) => setEditForm({...editForm, divisa: e.target.value})}
-                >
-                  <option value="EUR">EUR (€)</option>
-                  <option value="USD">USD ($)</option>
-                  <option value="GBP">GBP (£)</option>
-                  <option value="CHF">CHF (Fr)</option>
-                  <option value="JPY">JPY (¥)</option>
-                  <option value="CNY">CNY (¥)</option>
-                </select>
-              </div>
-            </div>
-          ) : (
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Banco</label>
-                <p>{payment.banco || '-'}</p>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Medio de Pago</label>
-                <p>{getMedioPagoDisplay(payment.medio_pago)}</p>
-              </div>
-            </div>
-          )}
-          {editingPayment && (
-            <div className="form-row">
-              <div className="form-group" style={{ width: '100%' }}>
-                <label className="form-label">Descripción del Gasto</label>
-                <textarea
-                  className="form-textarea"
-                  value={editForm.descripcion}
-                  onChange={(e) => setEditForm({...editForm, descripcion: e.target.value})}
-                />
-              </div>
-            </div>
-          )}
-          {editingPayment && (
-            <div className="flex gap-1 mt-3">
-              <button className="btn btn-primary" onClick={handleSaveEdit}>Guardar</button>
-              <button className="btn btn-warning" onClick={handleCancelEdit}>Cancelar</button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        <div className="card" style={{ width: '350px' }}>
-          <h3 className="card-title">Workflow</h3>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-            {getTipoPagoStr(payment?.tipo_pago) === 'SIN_FACTURA' ? 'Flujo sin factura' : 'Flujo con factura'}
+        {/* Column 2: Workflow */}
+        <div className="workflow-column">
+          <div className="card">
+            <h3 className="card-title">Workflow</h3>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+              {getTipoPagoStr(payment?.tipo_pago) === 'SIN_FACTURA' ? 'Flujo sin factura' : 'Flujo con factura'}
+            </div>
+            <div className="workflow-timeline">
+              {sortedWorkflowStates.map((state, index) => {
+                const areaComments = commentsByArea[state.area] || [];
+                const hasActed = state.estado !== 'PENDIENTE' || areaComments.length > 0;
+                const canReverse = hasActed && state.estado !== 'RECHAZADO';
+                // Check if current user can act on this area
+                const userRole = user?.role;
+                const userAreas = AREAS_BY_ROLE[userRole] || [];
+                const canAct = userAreas.includes(state.area);
+                return (
+                  <React.Fragment key={state.area}>
+                    <div className={`workflow-step ${state.estado.toLowerCase()}`}>
+                      <div className="workflow-step-header">
+                        <div className="workflow-step-icon">{AREA_ICONS[state.area]}</div>
+                        <div className="workflow-step-info">
+                          <div className="workflow-step-name">{AREAS_DISPLAY[state.area]}</div>
+                          <div className="workflow-step-status">{getWorkflowDisplayEstado(state.estado)}</div>
+                        </div>
+                        <div className="flex gap-1 items-center">
+                          {canAct && state.estado !== 'APROBADO' && state.estado !== 'RECHAZADO' && (
+                            <button
+                              className="btn btn-success"
+                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                              onClick={() => setActionModal({ type: 'advance', area: state.area })}
+                            >
+                              {AREA_ACTIONS[state.area] || 'Avanzar'}
+                            </button>
+                          )}
+                          {canReverse && canAct && (
+                            <button
+                              className="btn btn-danger"
+                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                              onClick={() => setActionModal({ type: 'reverse', area: state.area })}
+                              title="Revertir"
+                            >
+                              ↩
+                            </button>
+                          )}
+                          {hasActed && (
+                            <span style={{ color: 'var(--success)', fontWeight: 'bold', fontSize: '1rem' }} title="Completado">✓</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {index < sortedWorkflowStates.length - 1 && (
+                      <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.7rem', padding: '2px 0' }}>
+                        ↓
+                      </div>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </div>
           </div>
-          <div className="workflow-timeline">
-            {sortedWorkflowStates.map((state, index) => {
-              const areaComments = commentsByArea[state.area] || [];
-              const hasActed = state.estado !== 'PENDIENTE' || areaComments.length > 0;
-              const canReverse = hasActed && state.estado !== 'RECHAZADO';
-              // Check if current user can act on this area
-              const userRole = user?.role;
-              const userAreas = AREAS_BY_ROLE[userRole] || [];
-              const canAct = userAreas.includes(state.area);
-              return (
-                <React.Fragment key={state.area}>
-                  <div className={`workflow-step ${state.estado.toLowerCase()}`}>
-                    <div className="workflow-step-header">
-                      <div className="workflow-step-icon">{AREA_ICONS[state.area]}</div>
-                      <div className="workflow-step-info">
-                        <div className="workflow-step-name">{AREAS_DISPLAY[state.area]}</div>
-                        <div className="workflow-step-status">{getWorkflowDisplayEstado(state.estado)}</div>
-                      </div>
-                      <div className="flex gap-1 items-center">
-                        {canAct && state.estado !== 'APROBADO' && state.estado !== 'RECHAZADO' && (
-                          <button
-                            className="btn btn-success"
-                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-                            onClick={() => setActionModal({ type: 'advance', area: state.area })}
-                          >
-                            {AREA_ACTIONS[state.area] || 'Avanzar'}
-                          </button>
-                        )}
-                        {canReverse && canAct && (
-                          <button
-                            className="btn btn-danger"
-                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-                            onClick={() => setActionModal({ type: 'reverse', area: state.area })}
-                            title="Revertir"
-                          >
-                            ↩
-                          </button>
-                        )}
-                        {hasActed && (
-                          <span style={{ color: 'var(--success)', fontWeight: 'bold', fontSize: '1rem' }} title="Completado">✓</span>
-                        )}
-                      </div>
+        </div>
+
+        {/* Column 3: Comentarios */}
+        <div className="comments-column">
+          <div className="card">
+            <h3 className="card-title">Comentarios</h3>
+            <div className="form-group">
+              <label className="form-label">Añadir comentario:</label>
+              <div className="flex gap-1 mb-2">
+                <select
+                  className="form-select"
+                  style={{ width: 'auto' }}
+                  value={commentArea || ''}
+                  onChange={(e) => setCommentArea(e.target.value || null)}
+                >
+                  <option value="">Selecciona área...</option>
+                  {getAreasOrder().map(area => (
+                    <option key={area} value={area}>{AREAS_DISPLAY[area]}</option>
+                  ))}
+                </select>
+              </div>
+              <textarea
+                className="form-textarea"
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Escribe tu comentario..."
+                style={{ minHeight: '80px' }}
+              />
+              <div className="mt-2">
+                <label
+                  className="form-label"
+                  style={{ fontSize: '0.875rem', cursor: 'pointer' }}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const files = Array.from(e.dataTransfer.files);
+                    if (files.length > 0) setCommentDoc(files[0]);
+                  }}
+                >
+                  Adjuntar documento (arrastra o haz clic):
+                </label>
+                <input
+                  type="file"
+                  onChange={(e) => setCommentDoc(e.target.files[0] || null)}
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+                  style={{ display: 'block', marginTop: '0.25rem' }}
+                />
+                {commentDoc && <span className="text-muted ml-2">📎 {commentDoc.name}</span>}
+              </div>
+              <button
+                className="btn btn-primary mt-2"
+                onClick={() => handleAddComment(commentArea)}
+                disabled={!newComment.trim() || !commentArea || addingComment}
+              >
+                {addingComment ? 'Añadiendo...' : 'Añadir Comentario'}
+              </button>
+            </div>
+
+            <div className="mt-3">
+              {getAreasOrder().map(area => {
+                const areaComments = commentsByArea[area] || [];
+                if (areaComments.length === 0) return null;
+                return (
+                  <div key={area} className="comment-area-section">
+                    <div className="comment-area-title">
+                      {AREA_ICONS[area]} {AREAS_DISPLAY[area]}
                     </div>
+                    {areaComments.map((comment) => (
+                      <div key={comment.id} className="comment">
+                        <div className="comment-header">
+                          <span className="comment-author">
+                            {comment.usuario?.nombre || comment.usuario?.username || 'Usuario'}
+                            {comment.usuario?.email && <span style={{ fontWeight: 'normal', fontSize: '0.8em', marginLeft: '0.5em' }}>({comment.usuario.email})</span>}
+                          </span>
+                          <span className="comment-date">{formatDate(comment.created_at)}</span>
+                        </div>
+                        <div className="comment-content">
+                          {comment.contenido.split('\n').map((line, i, arr) => (
+                            <React.Fragment key={i}>
+                              {line}
+                              {i < arr.length - 1 && <br />}
+                            </React.Fragment>
+                          ))}
+                        </div>
+                        {comment.documentos && comment.documentos.length > 0 && (
+                          <div className="comment-attachments mt-1">
+                            <strong style={{ fontSize: '0.75rem' }}>Documentos adjuntos:</strong>
+                            {comment.documentos.map(doc => (
+                              <div key={doc.id} style={{ marginTop: '2px' }}>
+                                <button className="btn btn-secondary btn-sm" onClick={() => handleDownloadDocument(doc.id, doc.nombre_original)}>
+                                  📎 {doc.nombre_original}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  {index < sortedWorkflowStates.length - 1 && (
-                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.7rem', padding: '2px 0' }}>
-                      ↓
-                    </div>
-                  )}
-                </React.Fragment>
-              );
-            })}
+                );
+              })}
+              {comments.length === 0 && (
+                <div className="empty-state">
+                  <p>No hay comentarios</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Documents */}
       <div className="card mt-3">
         <div className="card-header">
           <h3 className="card-title">Documentos</h3>

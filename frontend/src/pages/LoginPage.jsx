@@ -81,9 +81,7 @@ export default function LoginPage({ onLogin }) {
             Iniciar sesión
           </button>
         </form>
-        <p style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.875rem', color: '#64748b' }}>
-          Demo: admin/admin123
-        </p>
+
       </div>
     </div>
   );

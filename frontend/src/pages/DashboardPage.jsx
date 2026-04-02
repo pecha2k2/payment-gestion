@@ -4,6 +4,36 @@ import { api } from '../api';
 
 const AREAS_ORDER = ['demandante', 'validadora', 'aprobadora', 'contabilidad', 'pagadora', 'sap'];
 
+// Helper function to determine next action
+const getNextAction = (payment) => {
+  if (payment.estado_general === 'COMPLETADA') return 'Completada';
+  if (payment.estado_general === 'CANCELADA') return 'Cancelada';
+  
+  // Find first pending area in workflow order
+  const workflowOrder = payment.tipo_pago === 'CON_FACTURA' 
+    ? ['demandante', 'validadora', 'aprobadora', 'contabilidad', 'pagadora', 'sap']
+    : ['demandante', 'aprobadora', 'pagadora', 'validadora', 'contabilidad', 'sap'];
+  
+  if (payment.workflow_states) {
+    for (const area of workflowOrder) {
+      const state = payment.workflow_states.find(ws => ws.area === area);
+      if (state && state.estado === 'PENDIENTE') {
+        const areaNames = {
+          demandante: 'Demandante',
+          validadora: 'Validadora',
+          aprobadora: 'Aprobadora',
+          contabilidad: 'Contabilidad',
+          pagadora: 'Pagadora',
+          sap: 'SAP'
+        };
+        return `Pendiente: ${areaNames[area]}`;
+      }
+    }
+  }
+  
+  return 'En proceso';
+};
+
 // Format number with Spanish thousands separator
 const formatCurrency = (value, divisa = 'EUR') => {
   const num = typeof value === 'string' ? parseFloat(value) : value;
@@ -247,6 +277,7 @@ export default function DashboardPage({ user }) {
                     <th>OP</th>
                     <th>Tipo</th>
                     <th>Estado</th>
+                    <th>Siguiente acción</th>
                     <th>Monto</th>
                   </tr>
               </thead>
@@ -262,6 +293,7 @@ export default function DashboardPage({ user }) {
                     <td><span className={`badge badge-${payment.estado_general.toLowerCase()}`}>
                       {payment.estado_general}
                     </span></td>
+                    <td>{getNextAction(payment)}</td>
                     <td>{formatCurrency(payment.monto_total, payment.divisa)}</td>
                   </tr>
                 ))}
