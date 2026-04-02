@@ -296,10 +296,6 @@ export default function PaymentDetailPage({ user }) {
     }
     try {
       let comentario = actionComment;
-      if (actionDocuments.length > 0) {
-        const names = actionDocuments.map(d => d.name).join(', ');
-        comentario = `${comentario}\n[Adjuntos: ${names}]`;
-      }
       // First advance workflow (creates the comment)
       const result = await api.advanceWorkflow(id, actionModal.area, comentario);
       const commentId = result?.comment_id;
@@ -348,10 +344,6 @@ export default function PaymentDetailPage({ user }) {
     setAddingComment(true);
     try {
       let commentContent = newComment;
-      // Include document filename in comment if attached
-      if (commentDoc) {
-        commentContent = `${commentContent}\n[Adjunto: ${commentDoc.name}]`;
-      }
       await api.addComment(id, area, commentContent);
       setNewComment('');
       setCommentArea(null);
