@@ -4,6 +4,7 @@ from typing import List, Optional, Tuple
 from datetime import datetime, timezone
 import json
 import logging
+import os
 
 from app.models.payment import PaymentRequest, Document
 from app.models.workflow import WorkflowState, WorkflowConfig, WorkflowEstado, Area
@@ -76,7 +77,11 @@ def create_payment_request(
         .first()
     )
     if workflow_config:
-        flujo = workflow_config.flujo_json if not isinstance(workflow_config.flujo_json, str) else json.loads(workflow_config.flujo_json)
+        flujo = (
+            workflow_config.flujo_json
+            if not isinstance(workflow_config.flujo_json, str)
+            else json.loads(workflow_config.flujo_json)
+        )
         workflow_config_id = workflow_config.id
         logger.info(
             "Using DB WorkflowConfig id=%s for tipo_pago=%s",
@@ -265,6 +270,43 @@ def get_payment_by_id(db: Session, payment_id: int) -> Optional[PaymentRequest]:
         .filter(PaymentRequest.id == payment_id)
         .first()
     )
+
+
+def delete_payment(db: Session, payment_id: int) -> None:
+    """Delete payment and all associated resources (documents, files, directory).
+
+    Raises ValueError if payment not found.
+    The caller is responsible for permission checks before calling this function.
+    """
+    payment = get_payment_by_id(db, payment_id)
+    if not payment:
+        raise ValueError(f"Petición de pago {payment_id} no encontrada")
+
+    # Delete associated documents (physical files + DB records)
+    documents = (
+        db.query(Document).filter(Document.payment_request_id == payment_id).all()
+    )
+    for doc in documents:
+        if doc.ruta_storage and os.path.exists(doc.ruta_storage):
+            try:
+                os.remove(doc.ruta_storage)
+            except OSError as e:
+                logger.warning("Could not delete file %s: %s", doc.ruta_storage, e)
+        db.delete(doc)
+
+    # Delete the payment folder (e.g., PAY-2026-0001)
+    documents_dir = os.getenv("DOCUMENTS_DIR", "/app/documents")
+    payment_dir = os.path.join(documents_dir, payment.numero_peticion)
+    if os.path.exists(payment_dir):
+        import shutil
+
+        try:
+            shutil.rmtree(payment_dir)
+        except OSError as e:
+            logger.warning("Could not delete directory %s: %s", payment_dir, e)
+
+    db.delete(payment)
+    db.commit()
 
 
 def update_payment(

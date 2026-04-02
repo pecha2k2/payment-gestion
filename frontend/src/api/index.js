@@ -1,14 +1,13 @@
 const API_BASE = '/api';
 
-let accessToken = localStorage.getItem('access_token');
+// C-02: Token stored in memory only — NOT in localStorage.
+// localStorage is accessible via XSS; memory-only storage eliminates that attack surface.
+// Trade-off: the session does NOT persist across page refreshes (user must log in again).
+// This is intentional — see REQ-JWT-MEMORY spec.
+let accessToken = null;
 
 export function setToken(token) {
   accessToken = token;
-  if (token) {
-    localStorage.setItem('access_token', token);
-  } else {
-    localStorage.removeItem('access_token');
-  }
 }
 
 export function getToken() {
@@ -66,6 +65,7 @@ export const api = {
   getMe: () => request('/auth/me'),
 
   // Payments
+  getPaymentStats: () => request('/payments/stats'),
   getPayments: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     return request(`/payments${query ? '?' + query : ''}`);
@@ -122,9 +122,11 @@ export const api = {
     return `${API_BASE}/documents/public/${id}/view?token=${token}`;
   },
   deleteDocument: (id) => request(`/documents/${id}`, { method: 'DELETE' }),
-  downloadAllDocuments: (paymentId) => {
-    // Returns URL to download ZIP of all documents for a payment
-    return `${API_BASE}/documents/payment/${paymentId}/download-all`;
+  downloadAllDocuments: async (paymentId) => {
+    // C-05: Request an ephemeral token for the ZIP download (same pattern as downloadDocument).
+    // Previously returned a plain URL without auth, making the endpoint publicly accessible.
+    const { token } = await request(`/documents/payment/${paymentId}/request-zip-token`, { method: 'POST' });
+    return `${API_BASE}/documents/payment/${paymentId}/download-all?token=${token}`;
   },
 
   // Workflow

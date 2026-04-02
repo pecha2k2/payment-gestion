@@ -160,13 +160,41 @@ def delete_document(
     return {"message": "Documento eliminado"}
 
 
-@router.get("/payment/{payment_id}/download-all")
-def download_all_documents(
+@router.post("/payment/{payment_id}/request-zip-token")
+def request_zip_token(
     payment_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Descargar todos los documentos de un pago como ZIP."""
+    """Issue a 60-second ephemeral JWT for downloading the ZIP of all documents."""
+    payment = db.query(PaymentRequest).filter(PaymentRequest.id == payment_id).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Pago no encontrado")
+    # Reuse document token mechanism with a synthetic "payment zip" doc_id (negative payment_id)
+    token = create_document_token(current_user.id, -payment_id)
+    return {"token": token}
+
+
+@router.get("/payment/{payment_id}/download-all")
+def download_all_documents(
+    payment_id: int,
+    token: str = Query(...),
+    db: Session = Depends(get_db),
+):
+    """C-05: Descargar todos los documentos de un pago como ZIP usando token efímero.
+
+    Token is required (no Bearer auth) so the URL can be used as a direct download link.
+    Token is issued by POST /documents/payment/{payment_id}/request-zip-token.
+    """
+    # Validate ephemeral token (uses negative payment_id as synthetic doc_id)
+    user_id = decode_document_token(token, -payment_id)
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
+
+    user = db.query(User).filter(User.id == user_id, User.active == True).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="Usuario no autorizado")
+
     # Get payment and documents
     payment = db.query(PaymentRequest).filter(PaymentRequest.id == payment_id).first()
     if not payment:
@@ -183,10 +211,8 @@ def download_all_documents(
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
         for doc in documents:
             if os.path.exists(doc.ruta_storage):
-                # Add file to ZIP with original filename
                 zip_file.write(doc.ruta_storage, doc.nombre_original)
 
-    # Prepare response
     zip_buffer.seek(0)
     zip_filename = f"documentos_{payment.numero_peticion}.zip"
 

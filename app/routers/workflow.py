@@ -1,7 +1,9 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session, selectinload
 from app.database import get_db
+from app.middleware.rate_limit import search_limits
 from app.models.user import User
 from app.models.payment import PaymentRequest, Document
 from app.models.workflow import WorkflowConfig, WorkflowState, Comment
@@ -62,7 +64,9 @@ search_router = APIRouter(prefix="/api/search", tags=["search"])
 
 
 @search_router.get("")
+@search_limits()
 def search_payments(
+    request: Request,
     q: str,
     field: Optional[str] = None,
     db: Session = Depends(get_db),
@@ -74,7 +78,10 @@ def search_payments(
     If no field specified, searches all text fields including descripcion and comentarios.
     Supports wildcards: * (any characters), ? (single character)
     """
-    query = db.query(PaymentRequest)
+    # A-01: Use selectinload to avoid N+1 queries when loading workflow states
+    query = db.query(PaymentRequest).options(
+        selectinload(PaymentRequest.workflow_states)
+    )
 
     if field:
         if field == "propuesta_gasto":
@@ -98,51 +105,41 @@ def search_payments(
                 status_code=400, detail=f"Campo de búsqueda inválido: {field}"
             )
     else:
-        # Use SQL escaping for LIKE wildcards - prevent SQL injection
-        from sqlalchemy import func, or_
-
-        sql_pattern = q.replace("*", "%").replace("?", "_")
-        # Escape special LIKE characters to prevent injection
-        sql_pattern = sql_pattern.replace("%", "\\%").replace("_", "\\_")
+        # A-02: Correct LIKE escape order — escape SQL special chars FIRST, then apply user wildcards.
+        # Previous code did the opposite: converted * → % then escaped %, destroying the wildcards.
+        sql_safe = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        sql_pattern = sql_safe.replace("*", "%").replace("?", "_")
         search_pattern = f"%{sql_pattern}%"
 
-        query = query.outerjoin(Comment).filter(
-            or_(
-                func.lower(PaymentRequest.numero_peticion).like(
-                    search_pattern, escape="\\"
-                ),
-                func.lower(PaymentRequest.orden_pago).like(search_pattern, escape="\\"),
-                func.lower(PaymentRequest.numero_factura).like(
-                    search_pattern, escape="\\"
-                ),
-                func.lower(PaymentRequest.n_documento_contable).like(
-                    search_pattern, escape="\\"
-                ),
-                func.lower(PaymentRequest.descripcion).like(
-                    search_pattern, escape="\\"
-                ),
-                func.lower(Comment.contenido).like(search_pattern, escape="\\"),
-            )
-        )
-        # Also try propuesta_gasto as number if q is numeric
+        # A-03: propuesta_gasto must be inside or_() — not chained as AND via .filter()
+        or_clauses = [
+            func.lower(PaymentRequest.numero_peticion).like(
+                search_pattern, escape="\\"
+            ),
+            func.lower(PaymentRequest.orden_pago).like(search_pattern, escape="\\"),
+            func.lower(PaymentRequest.numero_factura).like(search_pattern, escape="\\"),
+            func.lower(PaymentRequest.n_documento_contable).like(
+                search_pattern, escape="\\"
+            ),
+            func.lower(PaymentRequest.descripcion).like(search_pattern, escape="\\"),
+            func.lower(Comment.contenido).like(search_pattern, escape="\\"),
+        ]
+
+        # Include propuesta_gasto as a numeric OR clause when q is a valid integer
         try:
             propuesta_value = int(q)
-            query = query.filter(PaymentRequest.propuesta_gasto == propuesta_value)
+            or_clauses.append(PaymentRequest.propuesta_gasto == propuesta_value)
         except ValueError:
-            pass  # Ignore if not a number
+            pass
+
+        query = query.outerjoin(Comment).filter(or_(*or_clauses))
 
     results = query.order_by(PaymentRequest.created_at.desc()).limit(50).all()
 
-    # For each result, include current workflow state info
+    # workflow_states already eagerly loaded — no additional queries per payment
     response = []
     for payment in results:
-        workflow_states = (
-            db.query(WorkflowState)
-            .filter(WorkflowState.payment_request_id == payment.id)
-            .all()
-        )
-
-        area_status = {ws.area.value: ws.estado.value for ws in workflow_states}
+        area_status = {ws.area.value: ws.estado.value for ws in payment.workflow_states}
 
         response.append(
             {

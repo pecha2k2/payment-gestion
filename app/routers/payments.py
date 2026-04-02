@@ -3,6 +3,7 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Request,
     status,
     UploadFile,
     File,
@@ -15,9 +16,10 @@ from datetime import datetime, timezone
 import os
 import pathlib
 import hashlib
-import shutil
 
+from sqlalchemy import func
 from app.database import get_db
+from app.middleware.rate_limit import upload_limits
 from app.models.user import User
 from app.models.payment import PaymentRequest, Document, DocumentoTipo, EstadoGeneral
 from app.models.workflow import WorkflowState, WorkflowConfig, WorkflowEstado, Area
@@ -71,6 +73,36 @@ ALLOWED_EXTENSIONS = {
     ".csv",
     ".zip",
 }
+
+
+@router.get("/stats")
+def get_payment_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """A-06: Return real COUNT(*) per estado_general — never loads payment entities.
+
+    Fixes the Dashboard bug where stats were calculated from max 100 payments in memory.
+    """
+    rows = (
+        db.query(
+            PaymentRequest.estado_general,
+            func.count(PaymentRequest.id).label("count"),
+        )
+        .group_by(PaymentRequest.estado_general)
+        .all()
+    )
+
+    counts = {row.estado_general.value: row.count for row in rows}
+    total = sum(counts.values())
+
+    return {
+        "total": total,
+        "abiertas": counts.get("ABIERTA", 0),
+        "en_proceso": counts.get("EN_PROCESO", 0),
+        "completadas": counts.get("COMPLETADA", 0),
+        "canceladas": counts.get("CANCELADA", 0),
+    }
 
 
 @router.get("", response_model=PaginatedResponse)
@@ -170,28 +202,8 @@ def delete_payment(
     # Delete associated workflow states and comments first
     workflow_service.delete_workflow_by_payment(db, payment_id)
 
-    # Delete associated documents (files)
-    from app.models.payment import Document
-
-    documents = (
-        db.query(Document).filter(Document.payment_request_id == payment_id).all()
-    )
-    for doc in documents:
-        # Delete physical file if exists
-        if doc.ruta_storage and os.path.exists(doc.ruta_storage):
-            os.remove(doc.ruta_storage)
-        db.delete(doc)
-
-    # Delete the payment folder (e.g., PAY-2026-0001)
-    payment_dir = os.path.join(
-        os.getenv("DOCUMENTS_DIR", "/app/documents"), payment.numero_peticion
-    )
-    if os.path.exists(payment_dir):
-        shutil.rmtree(payment_dir)
-
-    # Delete the payment request
-    db.delete(payment)
-    db.commit()
+    # A-05: Delegate file deletion + DB cleanup to payment_service (single responsibility)
+    payment_service.delete_payment(db, payment_id)
     return {"message": "Petición eliminada"}
 
 
@@ -219,7 +231,9 @@ def cancel_payment(
 
 # Document endpoints
 @router.post("/{payment_id}/documents")
+@upload_limits()
 async def upload_document(
+    request: Request,
     payment_id: int,
     file: UploadFile = File(...),
     tipo: DocumentoTipo = Form(DocumentoTipo.otro),

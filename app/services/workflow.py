@@ -55,7 +55,11 @@ def get_area_dependencies(db: Session, payment_id: int) -> dict:
         return AREA_DEPENDENCIES
 
     try:
-        areas = config.flujo_json if not isinstance(config.flujo_json, str) else json.loads(config.flujo_json)
+        areas = (
+            config.flujo_json
+            if not isinstance(config.flujo_json, str)
+            else json.loads(config.flujo_json)
+        )
     except (json.JSONDecodeError, TypeError):
         return AREA_DEPENDENCIES
 
@@ -107,11 +111,14 @@ def advance_workflow_state(
         if dep_state and dep_state.estado != WorkflowEstado.APROBADO:
             raise ValueError(f"No puedes avanzar hasta que {dep_area} haya aprobado")
 
+    # C-03: Use SELECT FOR UPDATE to prevent race conditions.
+    # Without this lock, two users with the same role could advance the same state simultaneously.
     state = (
         db.query(WorkflowState)
         .filter(
             WorkflowState.payment_request_id == payment_id, WorkflowState.area == area
         )
+        .with_for_update()
         .first()
     )
 
@@ -145,9 +152,6 @@ def advance_workflow_state(
         # Already approved
         return state
 
-    db.commit()
-    db.refresh(state)
-
     # Add comment when advancing
     if comentario:
         comment = Comment(
@@ -159,26 +163,26 @@ def advance_workflow_state(
             created_at=datetime.now(timezone.utc),
         )
         db.add(comment)
-        db.commit()
-        db.refresh(comment)
 
     # Check if all workflow states are approved -> auto-complete payment
-    if state.estado == WorkflowEstado.APROBADO:
-        db.refresh(payment)
-        if payment:
-            all_approved = (
-                db.query(WorkflowState)
-                .filter(
-                    WorkflowState.payment_request_id == payment_id,
-                    WorkflowState.estado != WorkflowEstado.APROBADO,
-                )
-                .count()
-                == 0
-            )
-            if all_approved:
-                payment.estado_general = EstadoGeneral.COMPLETADA
-                payment.updated_at = datetime.now(timezone.utc)
-                db.commit()
+    all_approved = (
+        db.query(WorkflowState)
+        .filter(
+            WorkflowState.payment_request_id == payment_id,
+            WorkflowState.estado != WorkflowEstado.APROBADO,
+            # Exclude current state (already updated in-memory but not yet committed)
+            WorkflowState.id != state.id,
+        )
+        .count()
+        == 0
+    )
+    if all_approved and payment:
+        payment.estado_general = EstadoGeneral.COMPLETADA
+        payment.updated_at = datetime.now(timezone.utc)
+
+    # A-04: Single atomic commit for state + comment + payment status
+    db.commit()
+    db.refresh(state)
 
     return state
 
@@ -197,11 +201,13 @@ def reverse_workflow_state(
             f"No tienes permiso para realizar acciones en el área {area.value}"
         )
 
+    # C-03: Lock the row to prevent concurrent reverses on the same state
     state = (
         db.query(WorkflowState)
         .filter(
             WorkflowState.payment_request_id == payment_id, WorkflowState.area == area
         )
+        .with_for_update()
         .first()
     )
 
@@ -220,30 +226,26 @@ def reverse_workflow_state(
         state.completed_at = None
         state.usuario_completo_id = None
 
-    db.commit()
-    db.refresh(state)
-
-    # If payment was COMPLETADA, revert to EN_PROCESO since not all areas are approved
-    if payment and payment.estado_general == EstadoGeneral.COMPLETADA:
-        payment.estado_general = EstadoGeneral.EN_PROCESO
-        payment.updated_at = datetime.now(timezone.utc)
-        db.commit()
-
-    # Check if all are PENDIENTE -> revert payment to ABIERTA
+    # Determine new payment status based on remaining states (current already updated in-memory)
     if payment:
-        all_pending = (
+        if payment.estado_general == EstadoGeneral.COMPLETADA:
+            # Was completed — revert to EN_PROCESO since a state is now PENDIENTE
+            payment.estado_general = EstadoGeneral.EN_PROCESO
+            payment.updated_at = datetime.now(timezone.utc)
+
+        # Check if ALL other states are also PENDIENTE -> revert payment to ABIERTA
+        other_non_pending = (
             db.query(WorkflowState)
             .filter(
                 WorkflowState.payment_request_id == payment_id,
                 WorkflowState.estado != WorkflowEstado.PENDIENTE,
+                WorkflowState.id != state.id,
             )
             .count()
-            == 0
         )
-        if all_pending:
+        if other_non_pending == 0:
             payment.estado_general = EstadoGeneral.ABIERTA
             payment.updated_at = datetime.now(timezone.utc)
-            db.commit()
 
     # Add comment
     comment = Comment(
@@ -255,7 +257,10 @@ def reverse_workflow_state(
         created_at=datetime.now(timezone.utc),
     )
     db.add(comment)
+
+    # A-04: Single atomic commit for state + payment status + comment
     db.commit()
+    db.refresh(state)
 
     return state
 

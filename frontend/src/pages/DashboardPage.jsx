@@ -75,22 +75,23 @@ export default function DashboardPage({ user }) {
 
   const loadDashboard = async () => {
     try {
-      const [paymentsData, incidencesSummary, myPending] = await Promise.all([
-        api.getPayments({ limit: 100 }),
+      // A-06: Use dedicated /stats endpoint (real COUNT queries) + separate recent payments.
+      // Previously loaded 100 payments and counted in-memory — incorrect with >100 records.
+      const [statsData, recentData, incidencesSummary, myPending] = await Promise.all([
+        api.getPaymentStats(),
+        api.getPayments({ limit: 5 }),
         api.getIncidencesSummary(),
-        api.getMyPendingIncidences()
+        api.getMyPendingIncidences(),
       ]);
 
-      // API returns {items: [...], total, page, pages} - extract items array
-      const payments = paymentsData.items || paymentsData;
-
-      setRecentPayments(payments.slice(0, 5));
+      const recentItems = recentData.items || recentData;
+      setRecentPayments(recentItems.slice(0, 5));
       setStats({
-        total: paymentsData.total || payments.length,
-        abiertas: payments.filter(p => p.estado_general === 'ABIERTA').length,
-        enProceso: payments.filter(p => p.estado_general === 'EN_PROCESO').length,
-        completadas: payments.filter(p => p.estado_general === 'COMPLETADA').length,
-        canceladas: payments.filter(p => p.estado_general === 'CANCELADA').length,
+        total: statsData.total,
+        abiertas: statsData.abiertas,
+        enProceso: statsData.en_proceso,
+        completadas: statsData.completadas,
+        canceladas: statsData.canceladas,
       });
       setSummary(incidencesSummary);
       setMyIncidences(myPending);

@@ -66,15 +66,20 @@ app = FastAPI(
 _origins_env = os.getenv("ALLOWED_ORIGINS", "")
 ALLOWED_ORIGINS = [o.strip() for o in _origins_env.split(",") if o.strip()] or ["*"]
 
-if ALLOWED_ORIGINS == ["*"]:
+# allow_credentials=True is invalid with allow_origins=["*"] per CORS spec (RFC 6454).
+# Browsers reject this combination. When wildcard is used, disable credentials.
+_allow_credentials = ALLOWED_ORIGINS != ["*"]
+
+if not _allow_credentials:
     logger.warning(
-        "CORS: allow_origins=['*'] con credentials=True. Configurar ALLOWED_ORIGINS en producción."
+        "CORS: allow_origins=['*'] — credentials deshabilitadas. "
+        "Configurar ALLOWED_ORIGINS con dominios explícitos en producción."
     )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
