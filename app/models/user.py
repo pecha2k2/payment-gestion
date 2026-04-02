@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum as SQLEnum
 from sqlalchemy.orm import relationship
 from app.database import Base
+from datetime import datetime, timezone
 import enum
 
 
@@ -25,7 +26,7 @@ class User(Base):
     role = Column(SQLEnum(UserRole), nullable=False, default=UserRole.demandante)
     area = Column(String(100), nullable=True)
     active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=None)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     payment_requests = relationship("PaymentRequest", back_populates="creadora")

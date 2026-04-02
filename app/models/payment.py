@@ -74,7 +74,7 @@ class PaymentRequest(Base):
     workflow_config_id = Column(
         Integer, ForeignKey("workflow_configs.id"), nullable=True
     )
-    created_at = Column(DateTime, default=None)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
         DateTime, default=None, onupdate=lambda: datetime.now(timezone.utc)
     )

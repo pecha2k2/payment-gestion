@@ -11,6 +11,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from app.database import Base
+from datetime import datetime, timezone
 import enum
 
 
@@ -60,7 +61,7 @@ class WorkflowState(Base):
     usuario_asignado_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     usuario_completo_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     completed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=None)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     payment_request = relationship("PaymentRequest", back_populates="workflow_states")
@@ -78,7 +79,7 @@ class Comment(Base):
     usuario_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     area = Column(String(50), nullable=True)  # Área a la que pertenece el comentario
     contenido = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=None)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     payment_request = relationship("PaymentRequest", back_populates="comments")

@@ -7,11 +7,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, FileResponse
 
+from app.config import validate_environment
 from app.database import SessionLocal
+from app.middleware.rate_limit import setup_rate_limiting
 from app.models.user import User
 from app.routers import auth, users, payments, documents, workflow, incidences
 from app.services.workflow import init_default_workflow_configs
 from app.utils.security import get_password_hash
+
+validate_environment()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -74,6 +78,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+setup_rate_limiting(app)
 
 # Include routers
 app.include_router(auth.router)
