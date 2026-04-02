@@ -1430,11 +1430,68 @@ tbody tr:hover {
 }
 
 /* Responsive: stack on mobile */
-@media (max-width: 1024px) {
+@media (max-width: 1200px) {
   .three-column-layout {
     grid-template-columns: 1fr;
     gap: 1rem;
   }
+}
+
+/* Dashboard table optimizations for 1080p */
+.dashboard-table table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.dashboard-table th,
+.dashboard-table td {
+  padding: 0.75rem 0.5rem;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-table th:first-child,
+.dashboard-table td:first-child {
+  width: 12%;
+}
+
+.dashboard-table th:nth-child(2),
+.dashboard-table td:nth-child(2) {
+  width: 10%;
+}
+
+.dashboard-table th:nth-child(3),
+.dashboard-table td:nth-child(3) {
+  width: 10%;
+}
+
+.dashboard-table th:nth-child(4),
+.dashboard-table td:nth-child(4) {
+  width: 12%;
+}
+
+.dashboard-table th:nth-child(5),
+.dashboard-table td:nth-child(5) {
+  width: 12%;
+}
+
+.dashboard-table th:nth-child(6),
+.dashboard-table td:nth-child(6) {
+  width: 20%;
+}
+
+.dashboard-table th:nth-child(7),
+.dashboard-table td:nth-child(7) {
+  width: 14%;
+}
+
+/* Container max-width for better 1080p display */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 1rem;
 }
 
 /* Two-column layout for workflow and comments */

@@ -26,7 +26,7 @@ const getNextAction = (payment) => {
           pagadora: 'Pagadora',
           sap: 'SAP'
         };
-        return `Pendiente: ${areaNames[area]}`;
+        return areaNames[area];
       }
     }
   }
@@ -268,17 +268,17 @@ export default function DashboardPage({ user }) {
             <Link to="/payments/new" className="btn btn-primary mt-2">Crear primera petición</Link>
           </div>
         ) : (
-          <div className="table-container">
+          <div className="table-container dashboard-table">
             <table>
               <thead>
-<tr>
-                    <th>Nº Petición</th>
-                    <th>Propuesta</th>
-                    <th>OP</th>
-                    <th>Tipo</th>
-                    <th>Estado</th>
-                    <th>Siguiente acción</th>
-                    <th>Monto</th>
+<tr className="dashboard-table-header">
+                    <th style={{ width: '12%' }}>Nº Petición</th>
+                    <th style={{ width: '10%' }}>Propuesta</th>
+                    <th style={{ width: '10%' }}>OP</th>
+                    <th style={{ width: '12%' }}>Tipo</th>
+                    <th style={{ width: '12%' }}>Estado</th>
+                    <th style={{ width: '18%' }}>Siguiente acción</th>
+                    <th style={{ width: '14%' }}>Monto</th>
                   </tr>
               </thead>
               <tbody>
