@@ -1530,28 +1530,28 @@ tbody tr:hover {
   }
 }
 
-/* Make comments scrollable if too long */
-.comments-column .card .mt-3 {
-  max-height: 500px;
-  overflow-y: auto;
-  padding-right: 0.5rem;
+/* Comments list - no scroll, show all */
+.comments-list {
+  max-height: none;
+  overflow-y: visible;
 }
 
-/* Custom scrollbar for comments */
+/* Remove old scroll styles for comments */
+.comments-column .card .mt-3 {
+  max-height: none;
+  overflow-y: visible;
+  padding-right: 0;
+}
+
+/* Custom scrollbar for comments - DISABLED */
 .comments-column .mt-3::-webkit-scrollbar {
-  width: 6px;
+  width: 0;
 }
 
 .comments-column .mt-3::-webkit-scrollbar-track {
-  background: var(--gray-200);
-  border-radius: 3px;
+  display: none;
 }
 
 .comments-column .mt-3::-webkit-scrollbar-thumb {
-  background: var(--gray-400);
-  border-radius: 3px;
-}
-
-.comments-column .mt-3::-webkit-scrollbar-thumb:hover {
-  background: var(--gray-500);
+  display: none;
 }

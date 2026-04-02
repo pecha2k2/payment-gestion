@@ -740,6 +740,43 @@ export default function PaymentDetailPage({ user }) {
         <div className="comments-column">
           <div className="card">
             <h3 className="card-title">Comentarios</h3>
+
+            <div className="mb-3">
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={async () => {
+                  // Collect all documents from comments
+                  const allDocs = [];
+                  comments.forEach(comment => {
+                    if (comment.documentos) {
+                      comment.documentos.forEach(doc => allDocs.push(doc));
+                    }
+                  });
+
+                  if (allDocs.length === 0) {
+                    alert('No hay documentos adjuntos para descargar');
+                    return;
+                  }
+
+                  if (allDocs.length === 1) {
+                    // Single file: download directly
+                    handleDownloadDocument(allDocs[0].id, allDocs[0].nombre_original);
+                  } else {
+                    // Multiple files: show coming soon
+                    alert('Descarga de múltiples archivos en ZIP: preparando...');
+                    // For now, download files one by one
+                    for (const doc of allDocs) {
+                      await handleDownloadDocument(doc.id, doc.nombre_original);
+                      await new Promise(resolve => setTimeout(resolve, 500));
+                    }
+                  }
+                }}
+              >
+                📦 Descargar todos los adjuntos
+              </button>
+            </div>
+
+            <div className="comments-list">
             <div className="form-group">
               <label className="form-label">Añadir comentario:</label>
               <div className="flex gap-1 mb-2">
