@@ -777,60 +777,6 @@ export default function PaymentDetailPage({ user }) {
             </div>
 
             <div className="comments-list">
-            <div className="form-group">
-              <label className="form-label">Añadir comentario:</label>
-              <div className="flex gap-1 mb-2">
-                <select
-                  className="form-select"
-                  style={{ width: 'auto' }}
-                  value={commentArea || ''}
-                  onChange={(e) => setCommentArea(e.target.value || null)}
-                >
-                  <option value="">Selecciona área...</option>
-                  {getAreasOrder().map(area => (
-                    <option key={area} value={area}>{AREAS_DISPLAY[area]}</option>
-                  ))}
-                </select>
-              </div>
-              <textarea
-                className="form-textarea"
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Escribe tu comentario..."
-                style={{ minHeight: '80px' }}
-              />
-              <div className="mt-2">
-                <label
-                  className="form-label"
-                  style={{ fontSize: '0.875rem', cursor: 'pointer' }}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const files = Array.from(e.dataTransfer.files);
-                    if (files.length > 0) setCommentDoc(files[0]);
-                  }}
-                >
-                  Adjuntar documento (arrastra o haz clic):
-                </label>
-                <input
-                  type="file"
-                  onChange={(e) => setCommentDoc(e.target.files[0] || null)}
-                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
-                  style={{ display: 'block', marginTop: '0.25rem' }}
-                />
-                {commentDoc && <span className="text-muted ml-2">📎 {commentDoc.name}</span>}
-              </div>
-              <button
-                className="btn btn-primary mt-2"
-                onClick={() => handleAddComment(commentArea)}
-                disabled={!newComment.trim() || !commentArea || addingComment}
-              >
-                {addingComment ? 'Añadiendo...' : 'Añadir Comentario'}
-              </button>
-            </div>
-
-            <div className="mt-3">
               {getAreasOrder().map(area => {
                 const areaComments = commentsByArea[area] || [];
                 if (areaComments.length === 0) return null;
