@@ -52,9 +52,60 @@ const AREAS_BY_ROLE = {
   demandante: ['demandante'],
   validador: ['validadora'],
   aprobador: ['aprobadora'],
-  contador: ['contabilidad', 'sap'],  // Contador can do contabilidad and SAP
+  contador: ['contabilidad', 'sap'],
   pagador: ['pagadora'],
   sap: ['sap'],
+};
+
+// File validation constants (must match backend)
+const MAX_FILE_SIZE_MB = 50;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv', '.zip', '.msg'];
+
+// Validate file before upload
+const validateFile = (file) => {
+  const ext = '.' + file.name.split('.').pop().toLowerCase();
+  if (!ALLOWED_EXTENSIONS.includes(ext)) {
+    return { valid: false, error: `Tipo de archivo no permitido: ${ext}. Permitidos: ${ALLOWED_EXTENSIONS.join(', ')}` };
+  }
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    return { valid: false, error: `El archivo excede el límite de ${MAX_FILE_SIZE_MB} MB` };
+  }
+  return { valid: true, error: null };
+};
+
+// Handle clipboard paste for images
+const handleClipboardPaste = async (e, callback) => {
+  e.preventDefault();
+  try {
+    const clipboardItems = await navigator.clipboard.read();
+    const imageItems = clipboardItems.filter(item => 
+      item.types.some(type => type.startsWith('image/'))
+    );
+    
+    if (imageItems.length === 0) {
+      alert('No se encontró ninguna imagen en el portapapeles');
+      return;
+    }
+    
+    for (const item of imageItems) {
+      const imageType = item.types.find(type => type.startsWith('image/'));
+      const blob = await item.getType(imageType);
+      const ext = imageType === 'image/png' ? '.png' : imageType === 'image/jpeg' ? '.jpg' : '.png';
+      const fileName = `pasted-image-${Date.now()}${ext}`;
+      const file = new File([blob], fileName, { type: imageType });
+      
+      const validation = validateFile(file);
+      if (validation.valid) {
+        callback(file);
+      } else {
+        alert(validation.error);
+      }
+    }
+  } catch (err) {
+    console.error('Error reading clipboard:', err);
+    alert('No se pudo acceder al portapapeles. Asegúrate de dar permisos o usa el botón de selección de archivos.');
+  }
 };
 
 // Helper to extract string value from enum
@@ -918,19 +969,42 @@ export default function PaymentDetailPage({ user }) {
                     e.stopPropagation();
                     setActionDragOver(false);
                     const files = Array.from(e.dataTransfer.files);
-                    if (files.length > 0) setActionDocuments(prev => [...prev, ...files]);
+                    const validFiles = [];
+                    for (const file of files) {
+                      const validation = validateFile(file);
+                      if (validation.valid) {
+                        validFiles.push(file);
+                      } else {
+                        alert(`${file.name}: ${validation.error}`);
+                      }
+                    }
+                    if (validFiles.length > 0) setActionDocuments(prev => [...prev, ...validFiles]);
                   }}
+                  onPaste={(e) => handleClipboardPaste(e, (file) => setActionDocuments(prev => [...prev, file]))}
                   style={{ padding: '1rem', fontSize: '0.875rem' }}
                 >
                   <p>Arrastra archivos aquí o haz clic para seleccionar</p>
+                  <p style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.5rem' }}>
+                    💡 También puedes pegar una imagen (Ctrl+V)
+                  </p>
                 </div>
                 <input
                   id="action-file-input"
                   type="file"
                   multiple
+                  accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.msg"
                   onChange={(e) => {
                     const files = Array.from(e.target.files);
-                    if (files.length > 0) setActionDocuments(prev => [...prev, ...files]);
+                    const validFiles = [];
+                    for (const file of files) {
+                      const validation = validateFile(file);
+                      if (validation.valid) {
+                        validFiles.push(file);
+                      } else {
+                        alert(`${file.name}: ${validation.error}`);
+                      }
+                    }
+                    if (validFiles.length > 0) setActionDocuments(prev => [...prev, ...validFiles]);
                   }}
                   style={{ display: 'none' }}
                 />
