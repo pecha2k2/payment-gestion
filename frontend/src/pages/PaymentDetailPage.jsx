@@ -699,7 +699,7 @@ export default function PaymentDetailPage({ user }) {
                           <div className="workflow-step-status">{getWorkflowDisplayEstado(state.estado)}</div>
                         </div>
                         <div className="flex gap-1 items-center">
-                          {canAct && state.estado !== 'APROBADO' && state.estado !== 'RECHAZADO' && (
+                          {payment.estado_general !== 'CANCELADA' && payment.estado_general !== 'COMPLETADA' && canAct && state.estado !== 'APROBADO' && state.estado !== 'RECHAZADO' && (
                             <button
                               className="btn btn-success"
                               style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
@@ -708,7 +708,7 @@ export default function PaymentDetailPage({ user }) {
                               {AREA_ACTIONS[state.area] || 'Avanzar'}
                             </button>
                           )}
-                          {canReverse && canAct && (
+                          {payment.estado_general !== 'CANCELADA' && payment.estado_general !== 'COMPLETADA' && canReverse && canAct && (
                             <button
                               className="btn btn-danger"
                               style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
