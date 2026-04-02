@@ -4,20 +4,12 @@ from slowapi.errors import RateLimitExceeded
 from fastapi import Request, HTTPException
 import os
 
-# Create limiter instance with Redis or memory storage
 _redis_url = os.getenv("REDIS_URL")
-if _redis_url:
-    from slowapi.storage import RedisStorage
-
-    storage = RedisStorage(_redis_url)
-else:
-    from slowapi.storage import MemoryStorage
-
-    storage = MemoryStorage()
+_storage_uri = f"redis://{_redis_url}" if _redis_url and not _redis_url.startswith("redis") else (_redis_url or "memory://")
 
 limiter = Limiter(
     key_func=get_remote_address,
-    storage=storage,
+    storage_uri=_storage_uri,
     default_limits=["100/minute"],
 )
 
