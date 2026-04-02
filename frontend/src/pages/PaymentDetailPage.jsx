@@ -153,6 +153,55 @@ const formatDate = (dateStr, showTime = true) => {
     return dateStr;
   };
 
+// Component to display image preview in comments
+function CommentImagePreview({ doc, onDownload }) {
+  const [imageUrl, setImageUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    const loadImage = async () => {
+      try {
+        const token = localStorage.getItem('access_token');
+        const response = await fetch(`/api/documents/${doc.id}/download`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          setImageUrl(url);
+        }
+      } catch (err) {
+        console.error('Error loading image:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadImage();
+    
+    return () => {
+      if (imageUrl) URL.revokeObjectURL(imageUrl);
+    };
+  }, [doc.id]);
+  
+  if (loading) return <span style={{ fontSize: '0.75rem', color: '#999' }}>Cargando imagen...</span>;
+  if (!imageUrl) return <span style={{ fontSize: '0.75rem', color: '#999' }}>Error cargando imagen</span>;
+  
+  return (
+    <div style={{ display: 'inline-block' }}>
+      <img 
+        src={imageUrl}
+        alt={doc.nombre_original}
+        style={{ maxWidth: '200px', maxHeight: '200px', borderRadius: '4px', border: '1px solid #ddd', cursor: 'pointer' }}
+        onClick={() => onDownload(doc.id, doc.nombre_original)}
+        title="Clic para descargar"
+      />
+      <span style={{ fontSize: '0.7rem', color: '#666', display: 'block', marginTop: '2px' }}>
+        📎 {doc.nombre_original}
+      </span>
+    </div>
+  );
+}
+
 export default function PaymentDetailPage({ user }) {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -832,16 +881,22 @@ export default function PaymentDetailPage({ user }) {
                             </React.Fragment>
                           ))}
                         </div>
-                        {comment.documentos && comment.documentos.length > 0 && (
-                          <div className="comment-attachments mt-1">
-                            <strong style={{ fontSize: '0.75rem' }}>Documentos adjuntos:</strong>
-                            {comment.documentos.map(doc => (
-                              <div key={doc.id} style={{ marginTop: '2px' }}>
-                                <button className="btn btn-secondary btn-sm" onClick={() => handleDownloadDocument(doc.id, doc.nombre_original)}>
-                                  📎 {doc.nombre_original}
-                                </button>
-                              </div>
-                            ))}
+                         {comment.documentos && comment.documentos.length > 0 && (
+                          <div className="comment-attachments mt-2">
+                            <strong style={{ fontSize: '0.75rem', display: 'block', marginBottom: '4px' }}>Documentos adjuntos:</strong>
+                            <div className="flex flex-wrap gap-2">
+                              {comment.documentos.map(doc => (
+                                <div key={doc.id}>
+                                  {doc.mime_type?.startsWith('image/') ? (
+                                    <CommentImagePreview doc={doc} onDownload={handleDownloadDocument} />
+                                  ) : (
+                                    <button className="btn btn-secondary btn-sm" onClick={() => handleDownloadDocument(doc.id, doc.nombre_original)}>
+                                      📎 {doc.nombre_original}
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
                       </div>
