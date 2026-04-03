@@ -1,7 +1,8 @@
 from __future__ import annotations
-from pydantic import BaseModel
-from typing import Optional, List, TYPE_CHECKING
+from pydantic import BaseModel, field_validator
+from typing import Optional, List, Any, TYPE_CHECKING
 from datetime import datetime
+import json
 from app.models.workflow import Area, WorkflowEstado
 
 if TYPE_CHECKING:
@@ -59,6 +60,16 @@ class WorkflowConfigResponse(WorkflowConfigBase):
     id: int
     activo: bool
 
+    @field_validator("flujo_json", mode="before")
+    @classmethod
+    def coerce_flujo_json_to_str(cls, v: Any) -> str:
+        """flujo_json is stored as Text in DB but SQLAlchemy may return it already
+        deserialized as a list (e.g. after json.loads somewhere upstream).
+        Always normalize to a JSON string before Pydantic validates the field."""
+        if isinstance(v, (list, dict)):
+            return json.dumps(v)
+        return v
+
     class Config:
         from_attributes = True
 
@@ -93,6 +104,7 @@ def rebuild_workflow_schemas():
     """Rebuild workflow schemas after all dependencies are loaded."""
     from app.schemas.payment import DocumentResponse
     from app.schemas.user import UserResponse
+
     # Rebuild with actual types
     CommentResponse.model_rebuild()
     WorkflowStateDetail.model_rebuild()
