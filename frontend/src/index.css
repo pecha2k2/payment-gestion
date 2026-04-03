@@ -1555,3 +1555,176 @@ tbody tr:hover {
 .comments-column .mt-3::-webkit-scrollbar-thumb {
   display: none;
 }
+
+/* ============================================================
+   PRINT STYLES
+   Limpia todo el ruido visual y muestra solo datos relevantes
+   ============================================================ */
+@media print {
+  /* Ocultar elementos de UI que no aportan en papel */
+  .navbar,
+  .dna-background,
+  .btn,
+  .modal-overlay,
+  .upload-zone,
+  .document-actions,
+  .comment-attachments,
+  .card-header .flex,
+  .workflow-step .flex.gap-1 {
+    display: none !important;
+  }
+
+  /* Reset general: fondo blanco, texto negro */
+  *,
+  *::before,
+  *::after {
+    background: white !important;
+    background-image: none !important;
+    color: black !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    animation: none !important;
+    transition: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body {
+    font-size: 11pt;
+    line-height: 1.4;
+  }
+
+  /* Layout: una sola columna para imprimir */
+  .three-column-layout {
+    display: block !important;
+  }
+
+  .info-column,
+  .workflow-column,
+  .comments-column {
+    width: 100% !important;
+    margin-bottom: 1rem !important;
+    page-break-inside: avoid;
+  }
+
+  .card {
+    border: 1px solid #ccc !important;
+    border-radius: 0 !important;
+    padding: 0.75rem !important;
+    margin-bottom: 0.75rem !important;
+    page-break-inside: avoid;
+  }
+
+  /* Datos de la petición: grid de 2 columnas funciona bien en papel */
+  .payment-info-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .payment-info-item {
+    background: #f5f5f5 !important;
+    border-left: 3px solid #333 !important;
+    padding: 0.5rem !important;
+  }
+
+  .payment-info-item.highlight {
+    border-left-color: #000 !important;
+  }
+
+  .payment-info-label {
+    font-size: 8pt !important;
+    color: #555 !important;
+  }
+
+  .payment-info-value {
+    font-size: 10pt !important;
+    font-weight: bold !important;
+    color: #000 !important;
+  }
+
+  /* Workflow: conservar colores de estado con bordres */
+  .workflow-step {
+    border: 1px solid #999 !important;
+    padding: 0.4rem 0.6rem !important;
+    margin-bottom: 0.25rem !important;
+  }
+
+  .workflow-step.aprobado {
+    border-color: #166534 !important;
+  }
+
+  .workflow-step.pendiente {
+    border-color: #888 !important;
+  }
+
+  .workflow-step-name {
+    font-weight: bold !important;
+  }
+
+  .workflow-step-status {
+    font-size: 9pt !important;
+  }
+
+  /* Comentarios */
+  .comment {
+    border-bottom: 1px solid #ddd !important;
+    padding: 0.4rem 0 !important;
+    page-break-inside: avoid;
+  }
+
+  .comment-author {
+    font-weight: bold !important;
+  }
+
+  .comment-date {
+    font-size: 8pt !important;
+    color: #555 !important;
+  }
+
+  /* Documentos: solo mostrar nombres, sin botones */
+  .document-item {
+    border: 1px solid #ddd !important;
+    padding: 0.4rem !important;
+  }
+
+  .document-name {
+    font-weight: bold !important;
+  }
+
+  .document-meta {
+    font-size: 8pt !important;
+  }
+
+  /* Cabecera de la petición */
+  h1 {
+    font-size: 16pt !important;
+    color: #000 !important;
+  }
+
+  /* Badges: borde en lugar de fondo de color */
+  .badge {
+    border: 1px solid #333 !important;
+    background: white !important;
+    color: #000 !important;
+    font-size: 9pt !important;
+  }
+
+  /* Evitar cortes de página feos */
+  .card,
+  .comment,
+  .workflow-step,
+  .document-item {
+    break-inside: avoid;
+  }
+
+  /* Salto de página antes de secciones grandes */
+  .card.mt-3 {
+    page-break-before: auto;
+  }
+
+  /* Mostrar URLs de links si hubiera */
+  a[href]::after {
+    content: none !important;
+  }
+}
