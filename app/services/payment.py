@@ -2,7 +2,6 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import text
 from typing import List, Optional, Tuple
 from datetime import datetime, timezone
-import json
 import logging
 import os
 
@@ -10,17 +9,16 @@ from app.models.payment import PaymentRequest, Document
 from app.models.workflow import WorkflowState, WorkflowConfig, WorkflowEstado, Area
 from app.models.user import User, UserRole
 from app.schemas.payment import PaymentRequestCreate, PaymentRequestUpdate
+from app.services.workflow import AREA_TO_ROLES, _parse_flujo_json
 
 logger = logging.getLogger(__name__)
 
-# Mapping between workflow areas and user roles
+# Derived from AREA_TO_ROLES in workflow.py — single source of truth.
+# Maps each area to its primary (non-admin) role for workflow state assignment.
 AREA_TO_ROLE = {
-    "demandante": UserRole.demandante,
-    "validadora": UserRole.validador,
-    "aprobadora": UserRole.aprobador,
-    "contabilidad": UserRole.contador,
-    "sap": UserRole.sap,
-    "pagadora": UserRole.pagador,
+    area: next((r for r in roles if r != UserRole.admin), roles[0])
+    for area, roles in AREA_TO_ROLES.items()
+    if roles
 }
 
 # Default workflow configurations
@@ -77,11 +75,7 @@ def create_payment_request(
         .first()
     )
     if workflow_config:
-        flujo = (
-            workflow_config.flujo_json
-            if not isinstance(workflow_config.flujo_json, str)
-            else json.loads(workflow_config.flujo_json)
-        )
+        flujo = _parse_flujo_json(workflow_config.flujo_json)
         workflow_config_id = workflow_config.id
         logger.info(
             "Using DB WorkflowConfig id=%s for tipo_pago=%s",
@@ -263,10 +257,13 @@ def get_payments_paginated(
 def get_payment_by_id(db: Session, payment_id: int) -> Optional[PaymentRequest]:
     from app.models.workflow import Comment
 
-    # Use selectinload for comments and their documents
+    # Use selectinload for workflow_states, comments and their documents
     return (
         db.query(PaymentRequest)
-        .options(selectinload(PaymentRequest.comments).selectinload(Comment.documentos))
+        .options(
+            selectinload(PaymentRequest.workflow_states),
+            selectinload(PaymentRequest.comments).selectinload(Comment.documentos),
+        )
         .filter(PaymentRequest.id == payment_id)
         .first()
     )

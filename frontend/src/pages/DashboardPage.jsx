@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
+import { AREA_ICONS, AREAS_DISPLAY, WORKFLOW_ORDER_CON_FACTURA, WORKFLOW_ORDER_SIN_FACTURA } from '../utils/constants';
+import { formatCurrency } from '../utils/formatters';
 
-const AREAS_ORDER = ['demandante', 'validadora', 'aprobadora', 'contabilidad', 'pagadora', 'sap'];
+const AREAS_ORDER = WORKFLOW_ORDER_CON_FACTURA;
 
 // Helper function to determine next action - returns area and display info
 const getNextActionInfo = (payment) => {
@@ -11,8 +13,8 @@ const getNextActionInfo = (payment) => {
   
   // Find first pending area in workflow order
   const workflowOrder = payment.tipo_pago === 'CON_FACTURA' 
-    ? ['demandante', 'validadora', 'aprobadora', 'contabilidad', 'pagadora', 'sap']
-    : ['demandante', 'aprobadora', 'pagadora', 'validadora', 'contabilidad', 'sap'];
+    ? WORKFLOW_ORDER_CON_FACTURA
+    : WORKFLOW_ORDER_SIN_FACTURA;
   
   if (payment.workflow_states) {
     for (const area of workflowOrder) {
@@ -24,35 +26,6 @@ const getNextActionInfo = (payment) => {
   }
   
   return { type: 'en_proceso', area: null };
-};
-
-// Format number with Spanish thousands separator
-const formatCurrency = (value, divisa = 'EUR') => {
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return '-';
-  return new Intl.NumberFormat('es-ES', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-    useGrouping: true,
-  }).format(num) + ' ' + divisa;
-};
-
-const AREAS_DISPLAY = {
-  demandante: 'Demandante',
-  validadora: 'Validadora',
-  aprobadora: 'Aprobadora',
-  contabilidad: 'Contabilidad',
-  pagadora: 'Pagadora',
-  sap: 'SAP',
-};
-
-const AREA_ICONS = {
-  demandante: '📝',
-  validadora: '✅',
-  aprobadora: '👍',
-  contabilidad: '📊',
-  pagadora: '💰',
-  sap: '☁️',
 };
 
 export default function DashboardPage({ user }) {
@@ -68,6 +41,7 @@ export default function DashboardPage({ user }) {
   const [recentPayments, setRecentPayments] = useState([]);
   const [myIncidences, setMyIncidences] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
 
   useEffect(() => {
     loadDashboard();
@@ -97,6 +71,7 @@ export default function DashboardPage({ user }) {
       setMyIncidences(myPending);
     } catch (err) {
       console.error('Error loading dashboard:', err);
+      setLoadError('Error cargando el dashboard. Intente recargar la página.');
     } finally {
       setLoading(false);
     }
@@ -122,6 +97,11 @@ export default function DashboardPage({ user }) {
 
   return (
     <div>
+      {loadError && (
+        <div style={{ color: 'var(--danger)', background: 'rgba(239,68,68,0.1)', padding: '1rem', borderRadius: '6px', marginBottom: '1rem' }}>
+          ⚠️ {loadError}
+        </div>
+      )}
       <div className="hero-gradient mb-3">
         <div className="dna-hero">
           {[...Array(6)].map((_, i) => (

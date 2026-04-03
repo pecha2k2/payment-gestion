@@ -14,7 +14,9 @@ const ROLES = [
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [editingUser, setEditingUser] = useState(null);
   const [formData, setFormData] = useState({
     username: '',
@@ -35,6 +37,7 @@ export default function UsersPage() {
       setUsers(data);
     } catch (err) {
       console.error('Error loading users:', err);
+      setLoadError('Error cargando los usuarios. Intente recargar la página.');
     } finally {
       setLoading(false);
     }
@@ -99,12 +102,35 @@ export default function UsersPage() {
     }
   };
 
+  const handleReactivate = async (userId) => {
+    if (!confirm('¿Reactivar este usuario?')) return;
+    try {
+      await api.reactivateUser(userId);
+      loadUsers();
+    } catch (err) {
+      alert('Error reactivando usuario: ' + err.message);
+    }
+  };
+
+  // Filtered users for local search
+  const filteredUsers = users.filter(u =>
+    !searchQuery ||
+    u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    u.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   if (loading) {
     return <div className="text-center">Cargando...</div>;
   }
 
   return (
     <div>
+      {loadError && (
+        <div style={{ color: 'var(--danger)', background: 'rgba(239,68,68,0.1)', padding: '1rem', borderRadius: '6px', marginBottom: '1rem' }}>
+          ⚠️ {loadError}
+        </div>
+      )}
       <div className="flex justify-between items-center mb-3">
         <h1>Gestión de Usuarios</h1>
         <button className="btn btn-primary" onClick={() => handleOpenModal()}>
@@ -113,9 +139,19 @@ export default function UsersPage() {
       </div>
 
       <div className="card">
-        {users.length === 0 ? (
+        <div style={{ marginBottom: '1rem' }}>
+          <input
+            type="text"
+            className="form-input"
+            placeholder="Buscar por usuario, nombre o email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ maxWidth: '300px' }}
+          />
+        </div>
+        {filteredUsers.length === 0 ? (
           <div className="empty-state">
-            <p>No hay usuarios creados</p>
+            <p>{users.length === 0 ? 'No hay usuarios creados' : 'No hay usuarios que coincidan con la búsqueda'}</p>
           </div>
         ) : (
           <div className="table-container">
@@ -132,7 +168,7 @@ export default function UsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {users.map(user => (
+                {filteredUsers.map(user => (
                   <tr key={user.id}>
                     <td>{user.username}</td>
                     <td>{user.name}</td>
@@ -163,6 +199,15 @@ export default function UsersPage() {
                           onClick={() => handleDelete(user.id)}
                         >
                           Eliminar
+                        </button>
+                      )}
+                      {!user.active && (
+                        <button
+                          className="btn btn-secondary"
+                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                          onClick={() => handleReactivate(user.id)}
+                        >
+                          Reactivar
                         </button>
                       )}
                     </td>

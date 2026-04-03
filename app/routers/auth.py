@@ -42,9 +42,28 @@ def login(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me")
 def get_current_user_info(current_user: User = Depends(get_current_user)):
-    return current_user
+    from app.services.workflow import AREA_TO_ROLES
+
+    accessible = [
+        area for area, roles in AREA_TO_ROLES.items() if current_user.role in roles
+    ]
+    role_value = (
+        current_user.role.value
+        if hasattr(current_user.role, "value")
+        else current_user.role
+    )
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "name": current_user.name,
+        "email": current_user.email,
+        "role": role_value,
+        "area": current_user.area,
+        "active": current_user.active,
+        "accessible_areas": accessible,
+    }
 
 
 @router.post("/logout")

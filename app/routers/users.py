@@ -67,6 +67,22 @@ def update_user(
     return user
 
 
+@router.post("/{user_id}/reactivate")
+def reactivate_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if user.active:
+        raise HTTPException(status_code=400, detail="El usuario ya está activo")
+    user.active = True
+    db.commit()
+    return {"message": "Usuario reactivado correctamente"}
+
+
 @router.delete("/{user_id}")
 def delete_user(
     user_id: int,

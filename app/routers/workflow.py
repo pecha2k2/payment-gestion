@@ -83,6 +83,19 @@ def search_payments(
         selectinload(PaymentRequest.workflow_states)
     )
 
+    # SEC-06: Role-based data isolation — non-admin users only see their own payments
+    if current_user.role.value != "admin":
+        if current_user.role.value == "demandante":
+            query = query.filter(PaymentRequest.creadora_id == current_user.id)
+        else:
+            # Only payments where the user has a workflow state assigned
+            assigned_payment_ids = (
+                db.query(WorkflowState.payment_request_id)
+                .filter(WorkflowState.usuario_asignado_id == current_user.id)
+                .subquery()
+            )
+            query = query.filter(PaymentRequest.id.in_(assigned_payment_ids))
+
     def _build_search_pattern(raw: str) -> str:
         """Escape SQL LIKE special chars, convert user wildcards, lowercase for func.lower() match."""
         sql_safe = raw.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

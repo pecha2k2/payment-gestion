@@ -1,4 +1,9 @@
-"""Permission decorators for common access patterns."""
+"""Permission decorators for common access patterns.
+
+NOTE: Dead code — these decorators are not currently used by any router.
+Kept as reference for future refactoring. Do NOT delete until a decision
+is made on whether to adopt this pattern across the codebase.
+"""
 
 from functools import wraps
 from fastapi import HTTPException, Depends

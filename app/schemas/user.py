@@ -35,6 +35,7 @@ class UserResponse(UserBase):
     id: int
     active: bool
     created_at: Optional[datetime] = None
+    accessible_areas: list[str] = []  # computed field — areas this user can act on
 
     class Config:
         from_attributes = True

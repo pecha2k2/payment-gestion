@@ -1,32 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
-
-const AVAILABLE_AREAS = [
-  { value: 'demandante', label: '📝 Demandante' },
-  { value: 'validadora', label: '✅ Validadora' },
-  { value: 'aprobadora', label: '👍 Aprobadora' },
-  { value: 'contabilidad', label: '📊 Contabilidad' },
-  { value: 'pagadora', label: '💰 Pagadora' },
-  { value: 'sap', label: '☁️ SAP' },
-];
-
-const AREA_ICONS = {
-  demandante: '📝',
-  validadora: '✅',
-  aprobadora: '👍',
-  contabilidad: '📊',
-  pagadora: '💰',
-  sap: '☁️',
-};
+import { AREA_ICONS, AVAILABLE_AREAS } from '../utils/constants';
 
 export default function WorkflowConfigsPage() {
   const [configs, setConfigs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [editingConfig, setEditingConfig] = useState(null);
   const [formData, setFormData] = useState({
     nombre: '',
     descripcion: '',
+    tipo_pago: 'CON_FACTURA',
     es_default: false,
     flujo_json: JSON.stringify(['demandante', 'validadora', 'aprobadora', 'contabilidad', 'pagadora', 'sap'], null, 2),
     activo: true,
@@ -43,6 +28,7 @@ export default function WorkflowConfigsPage() {
       setConfigs(data);
     } catch (err) {
       console.error('Error loading workflow configs:', err);
+      setLoadError('Error cargando las configuraciones de flujo. Intente recargar la página.');
     } finally {
       setLoading(false);
     }
@@ -71,6 +57,7 @@ export default function WorkflowConfigsPage() {
       setFormData({
         nombre: config.nombre,
         descripcion: config.descripcion || '',
+        tipo_pago: config.tipo_pago || 'CON_FACTURA',
         es_default: config.es_default,
         flujo_json: typeof config.flujo_json === 'string' 
           ? JSON.stringify(JSON.parse(config.flujo_json), null, 2)
@@ -82,6 +69,7 @@ export default function WorkflowConfigsPage() {
       setFormData({
         nombre: '',
         descripcion: '',
+        tipo_pago: 'CON_FACTURA',
         es_default: false,
         flujo_json: JSON.stringify(['demandante', 'validadora', 'aprobadora', 'contabilidad', 'pagadora', 'sap'], null, 2),
         activo: true,
@@ -102,6 +90,7 @@ export default function WorkflowConfigsPage() {
       const payload = {
         nombre: formData.nombre,
         descripcion: formData.descripcion,
+        tipo_pago: formData.tipo_pago,
         es_default: formData.es_default,
         flujo_json: JSON.stringify(flujo),
         activo: formData.activo,
@@ -145,6 +134,11 @@ export default function WorkflowConfigsPage() {
 
   return (
     <div>
+      {loadError && (
+        <div style={{ color: 'var(--danger)', background: 'rgba(239,68,68,0.1)', padding: '1rem', borderRadius: '6px', marginBottom: '1rem' }}>
+          ⚠️ {loadError}
+        </div>
+      )}
       <div className="flex justify-between items-center mb-3">
         <div>
           <h1>Configuración de Flujos</h1>
@@ -169,6 +163,7 @@ export default function WorkflowConfigsPage() {
                 <tr>
                   <th>Nombre</th>
                   <th>Descripción</th>
+                  <th>Tipo</th>
                   <th>Flujo</th>
                   <th>Estado</th>
                   <th>Acciones</th>
@@ -186,6 +181,11 @@ export default function WorkflowConfigsPage() {
                       )}
                     </td>
                     <td>{config.descripcion || '-'}</td>
+                    <td>
+                      <span className={`badge ${config.tipo_pago === 'SIN_FACTURA' ? 'badge-en_proceso' : 'badge-abierta'}`}>
+                        {config.tipo_pago === 'SIN_FACTURA' ? 'Sin Factura' : 'Con Factura'}
+                      </span>
+                    </td>
                     <td>
                       {renderFlujoPreview(config.flujo_json)}
                     </td>
@@ -259,6 +259,19 @@ export default function WorkflowConfigsPage() {
                   onChange={(e) => setFormData(prev => ({ ...prev, descripcion: e.target.value }))}
                   placeholder="Ej: Para pagos que requieren validación de factura"
                 />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Tipo de Pago *</label>
+                <select
+                  className="form-select"
+                  value={formData.tipo_pago}
+                  onChange={(e) => setFormData(prev => ({ ...prev, tipo_pago: e.target.value }))}
+                  required
+                >
+                  <option value="CON_FACTURA">Con Factura</option>
+                  <option value="SIN_FACTURA">Sin Factura</option>
+                </select>
               </div>
 
               <div className="form-group">

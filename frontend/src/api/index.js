@@ -162,6 +162,7 @@ export const api = {
   createUser: (data) => request('/users', { method: 'POST', body: JSON.stringify(data) }),
   updateUser: (id, data) => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteUser: (id) => request(`/users/${id}`, { method: 'DELETE' }),
+  reactivateUser: (id) => request(`/users/${id}/reactivate`, { method: 'POST' }),
 
   // Search
   search: (q, field) => {

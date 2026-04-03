@@ -2,6 +2,21 @@ import React, { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../api';
 
+const MAX_FILE_SIZE_MB = 50;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv', '.zip', '.msg'];
+
+const validateFile = (file) => {
+  const ext = '.' + file.name.split('.').pop().toLowerCase();
+  if (!ALLOWED_EXTENSIONS.includes(ext)) {
+    return { valid: false, error: `Tipo no permitido: ${ext}` };
+  }
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    return { valid: false, error: `Archivo demasiado grande (máx ${MAX_FILE_SIZE_MB}MB)` };
+  }
+  return { valid: true };
+};
+
 export default function NewPaymentPage({ user }) {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
@@ -32,7 +47,15 @@ export default function NewPaymentPage({ user }) {
   };
 
   const addFiles = (files) => {
-    setDocuments(prev => [...prev, ...files]);
+    const valid = [];
+    const errors = [];
+    files.forEach(file => {
+      const result = validateFile(file);
+      if (result.valid) valid.push(file);
+      else errors.push(`${file.name}: ${result.error}`);
+    });
+    if (errors.length > 0) alert('Archivos rechazados:\n' + errors.join('\n'));
+    if (valid.length > 0) setDocuments(prev => [...prev, ...valid]);
   };
 
   const handleDragOver = (e) => {

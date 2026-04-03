@@ -14,6 +14,17 @@ from app.models.user import User, UserRole
 from app.models.payment import PaymentRequest, EstadoGeneral
 from app.schemas.workflow import WorkflowStateUpdate, CommentCreate
 
+
+def _parse_flujo_json(flujo_json) -> list:
+    """Parse flujo_json field — handles both str and list."""
+    if isinstance(flujo_json, list):
+        return flujo_json
+    try:
+        return json.loads(flujo_json)
+    except (json.JSONDecodeError, TypeError):
+        return []
+
+
 # Mapping from area to allowed roles (for workflow actions)
 AREA_TO_ROLES = {
     "demandante": [UserRole.demandante, UserRole.admin],
@@ -54,13 +65,8 @@ def get_area_dependencies(db: Session, payment_id: int) -> dict:
     if not config or not config.flujo_json:
         return AREA_DEPENDENCIES
 
-    try:
-        areas = (
-            config.flujo_json
-            if not isinstance(config.flujo_json, str)
-            else json.loads(config.flujo_json)
-        )
-    except (json.JSONDecodeError, TypeError):
+    areas = _parse_flujo_json(config.flujo_json)
+    if not areas:
         return AREA_DEPENDENCIES
 
     deps = {}
@@ -373,14 +379,16 @@ def delete_workflow_by_payment(db: Session, payment_id: int):
 
     Does NOT commit — caller is responsible for the final commit.
     This allows the entire payment deletion to be a single atomic transaction.
+    Uses a subquery to delete all comments in one shot instead of N queries.
     """
-    states = (
-        db.query(WorkflowState)
+    state_ids_subq = (
+        db.query(WorkflowState.id)
         .filter(WorkflowState.payment_request_id == payment_id)
-        .all()
+        .subquery()
     )
-    for state in states:
-        db.query(Comment).filter(Comment.workflow_state_id == state.id).delete()
+    db.query(Comment).filter(Comment.workflow_state_id.in_(state_ids_subq)).delete(
+        synchronize_session="fetch"
+    )
     db.query(WorkflowState).filter(
         WorkflowState.payment_request_id == payment_id
     ).delete()

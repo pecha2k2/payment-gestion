@@ -1,72 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
-
-const WORKFLOW_ORDER_CON_FACTURA = ['demandante', 'validadora', 'aprobadora', 'contabilidad', 'pagadora', 'sap'];
-const WORKFLOW_ORDER_SIN_FACTURA = ['demandante', 'aprobadora', 'pagadora', 'validadora', 'contabilidad', 'sap'];
-
-// Helper to extract string value from enum
-const getTipoPagoStr = (tipo) => {
-  if (!tipo) return 'CON_FACTURA';
-  if (typeof tipo === 'string') return tipo;
-  return tipo.value || tipo;
-};
-
-const formatDate = (dateStr) => {
-  if (!dateStr) return '-';
-  if (typeof dateStr !== 'string') return String(dateStr);
-  if (dateStr.includes(',')) {
-    return dateStr.split(',')[0].trim();
-  }
-  if (dateStr.includes('T')) {
-    const parts = dateStr.split('T')[0].split('-');
-    if (parts.length === 3) {
-      return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
-    }
-  }
-  if (dateStr.includes('/')) {
-    const parts = dateStr.split('/');
-    if (parts.length === 3) {
-      return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2].split(' ')[0]}`;
-    }
-  }
-  if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-    const parts = dateStr.split('-');
-    return `${parts[2]}/${parts[1]}/${parts[0]}`;
-  }
-  return dateStr;
-};
-
-// Format number with Spanish thousands separator (always show thousands separator)
-const formatCurrency = (value, divisa = 'EUR') => {
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return '-';
-  // Use Intl.NumberFormat with explicit grouping
-  return new Intl.NumberFormat('es-ES', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-    useGrouping: true,  // Force thousands separator
-  }).format(num) + ' ' + divisa;
-};
+import { WORKFLOW_ORDER_CON_FACTURA, WORKFLOW_ORDER_SIN_FACTURA, AREA_ICONS, AVAILABLE_AREAS } from '../utils/constants';
+import { formatCurrency, getTipoPagoStr } from '../utils/formatters';
 
 const AREAS = [
   { value: '', label: 'Todas' },
-  { value: 'demandante', label: '📝 Demandante' },
-  { value: 'validadora', label: '✅ Validadora' },
-  { value: 'aprobadora', label: '👍 Aprobadora' },
-  { value: 'contabilidad', label: '📊 Contabilidad' },
-  { value: 'pagadora', label: '💰 Pagadora' },
-  { value: 'sap', label: '☁️ SAP' },
+  ...AVAILABLE_AREAS,
 ];
-
-const AREA_ICONS = {
-  demandante: '📝',
-  validadora: '✅',
-  aprobadora: '👍',
-  contabilidad: '📊',
-  pagadora: '💰',
-  sap: '☁️',
-};
 
 const ESTADOS = [
   { value: '', label: 'Todos' },
@@ -81,6 +22,7 @@ export default function PaymentsListPage({ user }) {
   const [payments, setPayments] = useState([]);
   const [paymentsDetail, setPaymentsDetail] = useState({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [pagination, setPagination] = useState({ page: 1, per_page: 20, total: 0, pages: 0 });
   const [filters, setFilters] = useState({
     estado_general: searchParams.get('estado') || '',
@@ -116,20 +58,15 @@ export default function PaymentsListPage({ user }) {
         page: meta.page || 1,
       }));
 
-      // Load detail for all payments to get workflow states (only if not a search result)
-      if (filters.search === '' && items.length > 0) {
-        const detailPromises = items.map(p => api.getPayment(p.id));
-        const details = await Promise.all(detailPromises);
-        const detailMap = {};
-        details.forEach(d => {
-          detailMap[d.id] = d;
-        });
-        setPaymentsDetail(detailMap);
-      } else {
-        setPaymentsDetail({});
-      }
+      // Use workflow_states already included in the paginated response (no extra requests)
+      const detailMap = {};
+      items.forEach(p => {
+        detailMap[p.id] = p;
+      });
+      setPaymentsDetail(detailMap);
     } catch (err) {
       console.error('Error loading payments:', err);
+      setLoadError('Error cargando los pagos. Intente recargar la página.');
     } finally {
       setLoading(false);
     }
@@ -145,18 +82,12 @@ export default function PaymentsListPage({ user }) {
       const results = await api.search(filters.search, filters.searchField || undefined);
       setPayments(results);
 
-      // Load detail for all search results to get workflow states
-      if (results.length > 0) {
-        const detailPromises = results.map(p => api.getPayment(p.id));
-        const details = await Promise.all(detailPromises);
-        const detailMap = {};
-        details.forEach(d => {
-          detailMap[d.id] = d;
-        });
-        setPaymentsDetail(detailMap);
-      } else {
-        setPaymentsDetail({});
-      }
+      // Use workflow_states already included in the search response (no extra requests)
+      const detailMap = {};
+      results.forEach(p => {
+        detailMap[p.id] = p;
+      });
+      setPaymentsDetail(detailMap);
     } catch (err) {
       console.error('Error searching:', err);
     }
@@ -217,7 +148,7 @@ export default function PaymentsListPage({ user }) {
   };
 
   // Get workflow order for a payment - always based on payment.tipo_pago from the list response
-  const getWorkflowOrder = (payment) => {
+  const getWorkflowOrderForPayment = (payment) => {
     const tipoStr = getTipoPagoStr(payment.tipo_pago);
     return tipoStr === 'SIN_FACTURA'
       ? WORKFLOW_ORDER_SIN_FACTURA
@@ -226,7 +157,7 @@ export default function PaymentsListPage({ user }) {
 
   // Get mini workflow display for a payment
   const getWorkflowMiniDisplay = (payment) => {
-    const order = getWorkflowOrder(payment);
+    const order = getWorkflowOrderForPayment(payment);
     const detail = paymentsDetail[payment.id];
     if (!detail || !detail.workflow_states) {
       // If no detail, show all as PENDIENTE in correct order
@@ -252,9 +183,14 @@ export default function PaymentsListPage({ user }) {
 
   return (
     <div>
+      {loadError && (
+        <div style={{ color: 'var(--danger)', background: 'rgba(239,68,68,0.1)', padding: '1rem', borderRadius: '6px', marginBottom: '1rem' }}>
+          ⚠️ {loadError}
+        </div>
+      )}
       <div className="flex justify-between items-center mb-3">
         <h1>Peticiones de Pago</h1>
-        {user?.role === 'admin' || user?.role === 'demandante' || user?.role === 'demandante' ? (
+        {user?.role === 'admin' || user?.role === 'demandante' ? (
           <Link to="/payments/new" className="btn btn-primary">+ Nueva Petición</Link>
         ) : null}
       </div>

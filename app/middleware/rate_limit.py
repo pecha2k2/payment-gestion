@@ -5,7 +5,11 @@ from fastapi import Request, HTTPException
 import os
 
 _redis_url = os.getenv("REDIS_URL")
-_storage_uri = f"redis://{_redis_url}" if _redis_url and not _redis_url.startswith("redis") else (_redis_url or "memory://")
+_storage_uri = (
+    f"redis://{_redis_url}"
+    if _redis_url and not _redis_url.startswith("redis")
+    else (_redis_url or "memory://")
+)
 
 limiter = Limiter(
     key_func=get_remote_address,
@@ -39,3 +43,8 @@ def upload_limits():
 def search_limits():
     """Limits for search endpoints."""
     return limiter.limit("30/minute")
+
+
+def workflow_limits():
+    """Limits for workflow advance/reverse actions."""
+    return limiter.limit("20/minute")

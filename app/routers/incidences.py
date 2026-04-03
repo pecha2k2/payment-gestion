@@ -1,5 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
@@ -135,27 +136,27 @@ def get_incidences_summary(
     """
     Resumen de incidencias pendientes por área.
     Solo cuenta PENDIENTE (EN_PROCESO ya actuó).
+    Uses a single GROUP BY query instead of one query per area.
     """
-    summary = {}
-    for area in Area:
-        count = (
-            db.query(WorkflowState)
-            .filter(
-                WorkflowState.area == area,
-                WorkflowState.estado == WorkflowEstado.PENDIENTE,
-            )
-            .count()
-        )
-        summary[area.value] = count
+    # Single query with GROUP BY — replaces N per-area queries
+    rows = (
+        db.query(WorkflowState.area, func.count(WorkflowState.id).label("count"))
+        .filter(WorkflowState.estado == WorkflowEstado.PENDIENTE)
+        .group_by(WorkflowState.area)
+        .all()
+    )
+    by_area = {area.value: 0 for area in Area}  # init all areas to 0
+    for row in rows:
+        by_area[row.area.value] = row.count
 
     # Total del usuario actual (solo PENDIENTE)
     my_pending = (
-        db.query(WorkflowState)
+        db.query(func.count(WorkflowState.id))
         .filter(
             WorkflowState.usuario_asignado_id == current_user.id,
             WorkflowState.estado == WorkflowEstado.PENDIENTE,
         )
-        .count()
+        .scalar()
     )
 
-    return {"by_area": summary, "my_pending": my_pending}
+    return {"by_area": by_area, "my_pending": my_pending}

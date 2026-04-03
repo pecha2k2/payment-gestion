@@ -19,7 +19,7 @@ import hashlib
 
 from sqlalchemy import func
 from app.database import get_db
-from app.middleware.rate_limit import upload_limits
+from app.middleware.rate_limit import upload_limits, workflow_limits
 from app.models.user import User
 from app.models.payment import PaymentRequest, Document, DocumentoTipo, EstadoGeneral
 from app.models.workflow import WorkflowState, WorkflowConfig, WorkflowEstado, Area
@@ -267,6 +267,12 @@ async def upload_document(
 
     file_path = os.path.join(payment_dir, original_filename)
 
+    # Defense in depth: ensure file_path stays within payment_dir
+    if os.path.commonpath(
+        [os.path.abspath(file_path), os.path.abspath(payment_dir)]
+    ) != os.path.abspath(payment_dir):
+        raise HTTPException(status_code=400, detail="Nombre de archivo no válido")
+
     content = bytearray()
     while chunk := await file.read(8192):
         content.extend(chunk)
@@ -313,7 +319,9 @@ def get_payment_workflow(
 
 
 @router.post("/{payment_id}/workflow/{area}/advance")
+@workflow_limits()
 def advance_workflow(
+    request: Request,
     payment_id: int,
     area: str,
     body: dict = Body(None),
@@ -359,7 +367,9 @@ def advance_workflow(
 
 
 @router.post("/{payment_id}/workflow/{area}/reverse")
+@workflow_limits()
 def reverse_workflow(
+    request: Request,
     payment_id: int,
     area: str,
     body: dict = Body(...),

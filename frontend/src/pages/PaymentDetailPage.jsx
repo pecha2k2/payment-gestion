@@ -1,41 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api';
-
-const AREAS_ORDER_CON_FACTURA = ['demandante', 'validadora', 'aprobadora', 'contabilidad', 'pagadora', 'sap'];
-const AREAS_ORDER_SIN_FACTURA = ['demandante', 'aprobadora', 'pagadora', 'validadora', 'contabilidad', 'sap'];
-
-const WORKFLOW_ORDER_CON_FACTURA = ['demandante', 'validadora', 'aprobadora', 'contabilidad', 'pagadora', 'sap'];
-const WORKFLOW_ORDER_SIN_FACTURA = ['demandante', 'aprobadora', 'pagadora', 'validadora', 'contabilidad', 'sap'];
-
-const AREAS_DISPLAY = {
-  demandante: 'Demandante',
-  validadora: 'Validadora',
-  aprobadora: 'Aprobadora',
-  contabilidad: 'Contabilidad',
-  pagadora: 'Pagadora',
-  sap: 'SAP',
-};
-
-// Format number with Spanish thousands separator
-const formatCurrency = (value, divisa = 'EUR') => {
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return '-';
-  return new Intl.NumberFormat('es-ES', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-    useGrouping: true,
-  }).format(num) + ' ' + divisa;
-};
-
-const AREA_ICONS = {
-  demandante: '📝',
-  validadora: '✅',
-  aprobadora: '👍',
-  contabilidad: '📊',
-  pagadora: '💰',
-  sap: '☁️',
-};
+import { WORKFLOW_ORDER_CON_FACTURA, WORKFLOW_ORDER_SIN_FACTURA, AREAS_DISPLAY, AREA_ICONS } from '../utils/constants';
+import { formatCurrency, getTipoPagoStr as getTipoPagoStrUtil } from '../utils/formatters';
 
 const AREA_ACTIONS = {
   demandante: 'Cerrar',
@@ -44,17 +11,6 @@ const AREA_ACTIONS = {
   contabilidad: 'Contabilizar',
   pagadora: 'Pagar',
   sap: 'Subir a SAP',
-};
-
-// Areas each role can access
-const AREAS_BY_ROLE = {
-  admin: ['demandante', 'validadora', 'aprobadora', 'contabilidad', 'pagadora', 'sap'],
-  demandante: ['demandante'],
-  validador: ['validadora'],
-  aprobador: ['aprobadora'],
-  contador: ['contabilidad', 'sap'],
-  pagador: ['pagadora'],
-  sap: ['sap'],
 };
 
 // File validation constants (must match backend)
@@ -108,12 +64,8 @@ const handleClipboardPaste = async (e, callback) => {
   }
 };
 
-// Helper to extract string value from enum
-const getTipoPagoStr = (tipo) => {
-  if (!tipo) return 'CON_FACTURA';
-  if (typeof tipo === 'string') return tipo;
-  return tipo.value || tipo;
-};
+// Helper to extract string value from enum — delegates to shared util
+const getTipoPagoStr = getTipoPagoStrUtil;
 
 const getWorkflowDisplayEstado = (estado) => {
   switch (estado) {
@@ -213,16 +165,15 @@ export default function PaymentDetailPage({ user }) {
   const [loading, setLoading] = useState(true);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [newComment, setNewComment] = useState('');
-  const [commentAttachment, setCommentAttachment] = useState(null);
   const [commentArea, setCommentArea] = useState(null);
   const [addingComment, setAddingComment] = useState(false);
   const [actionModal, setActionModal] = useState(null);
   const [actionComment, setActionComment] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
   const [actionDocuments, setActionDocuments] = useState([]);
   const [uploadingActionDoc, setUploadingActionDoc] = useState(false);
   const [editingPayment, setEditingPayment] = useState(false);
   const [editForm, setEditForm] = useState({});
-  const [commentDoc, setCommentDoc] = useState(null);
   const [actionDragOver, setActionDragOver] = useState(false);
   const [docUploadModal, setDocUploadModal] = useState(false);
   const [pendingDocs, setPendingDocs] = useState([]);
@@ -294,6 +245,7 @@ export default function PaymentDetailPage({ user }) {
       alert('Debes escribir un comentario para avanzar el workflow');
       return;
     }
+    setActionLoading(true);
     try {
       let comentario = actionComment;
       // First advance workflow (creates the comment)
@@ -317,6 +269,8 @@ export default function PaymentDetailPage({ user }) {
     } catch (err) {
       console.error('Error advancing:', err);
       alert('Error avanzando el workflow');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -325,6 +279,7 @@ export default function PaymentDetailPage({ user }) {
       alert('Debes escribir un motivo para revertir');
       return;
     }
+    setActionLoading(true);
     try {
       await api.reverseWorkflow(id, actionModal.area, actionComment);
       setActionModal(null);
@@ -333,6 +288,8 @@ export default function PaymentDetailPage({ user }) {
     } catch (err) {
       console.error('Error reversing:', err);
       alert('Error revirtiendo el workflow');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -467,7 +424,6 @@ export default function PaymentDetailPage({ user }) {
       if (updateData.medio_pago === '' || updateData.medio_pago === null) {
         updateData.medio_pago = null;
       }
-      console.log('Updating payment with data:', updateData);
       await api.updatePayment(id, updateData);
       setEditingPayment(false);
       loadPayment();
@@ -500,7 +456,7 @@ export default function PaymentDetailPage({ user }) {
   // Get the correct areas order based on payment type
   const getAreasOrder = () => {
     const tipoStr = getTipoPagoStr(payment?.tipo_pago);
-    return tipoStr === 'SIN_FACTURA' ? AREAS_ORDER_SIN_FACTURA : AREAS_ORDER_CON_FACTURA;
+    return tipoStr === 'SIN_FACTURA' ? WORKFLOW_ORDER_SIN_FACTURA : WORKFLOW_ORDER_CON_FACTURA;
   };
 
   // Group comments by area
@@ -803,9 +759,8 @@ export default function PaymentDetailPage({ user }) {
                 const areaComments = commentsByArea[state.area] || [];
                 const hasActed = state.estado !== 'PENDIENTE' || areaComments.length > 0;
                 const canReverse = hasActed && state.estado !== 'RECHAZADO';
-                // Check if current user can act on this area
-                const userRole = user?.role;
-                const userAreas = AREAS_BY_ROLE[userRole] || [];
+                // Use server-computed accessible_areas — eliminates frontend/backend role mapping duplication
+                const userAreas = user?.accessible_areas || [];
                 const canAct = userAreas.includes(state.area);
                 return (
                   <React.Fragment key={state.area}>
@@ -927,29 +882,16 @@ export default function PaymentDetailPage({ user }) {
               className="btn btn-secondary"
               onClick={async () => {
                 try {
-                  const token = localStorage.getItem('access_token');
-                  const url = api.downloadAllDocuments(id);
-                  const response = await fetch(url, {
-                    headers: {
-                      'Authorization': `Bearer ${token}`
-                    }
-                  });
-                  if (!response.ok) {
-                    const error = await response.json().catch(() => ({}));
-                    throw new Error(error.detail || 'Error al descargar ZIP');
-                  }
-                  const blob = await response.blob();
-                  const blobUrl = window.URL.createObjectURL(blob);
+                  const url = await api.downloadAllDocuments(id);
                   const link = document.createElement('a');
-                  link.href = blobUrl;
+                  link.href = url;
                   link.download = `documentos_${payment.numero_peticion}.zip`;
                   document.body.appendChild(link);
                   link.click();
                   document.body.removeChild(link);
-                  window.URL.revokeObjectURL(blobUrl);
                 } catch (err) {
                   console.error('Error descargando ZIP:', err);
-                  alert(err.message || 'Error al descargar el archivo ZIP');
+                  alert('Error al descargar los documentos');
                 }
               }}
             >
@@ -1133,8 +1075,9 @@ export default function PaymentDetailPage({ user }) {
               <button
                 className={`btn ${actionModal.type === 'advance' ? 'btn-success' : 'btn-danger'}`}
                 onClick={actionModal.type === 'advance' ? handleAdvance : handleReverse}
+                disabled={actionLoading}
               >
-                {actionModal.type === 'advance' ? AREA_ACTIONS[actionModal.area] || 'Confirmar' : 'Revertir'}
+                {actionLoading ? 'Procesando...' : (actionModal.type === 'advance' ? AREA_ACTIONS[actionModal.area] || 'Confirmar' : 'Revertir')}
               </button>
             </div>
           </div>
