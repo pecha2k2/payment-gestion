@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import { WORKFLOW_ORDER_CON_FACTURA, WORKFLOW_ORDER_SIN_FACTURA, AREA_ICONS, AVAILABLE_AREAS } from '../utils/constants';
@@ -30,26 +30,23 @@ export default function PaymentsListPage({ user }) {
     search: '',
     searchField: '',
   });
+  // Debounce ref: avoids stale-closure bug where clearFilters() llamaba loadPayments()
+  // con los filtros anteriores antes de que setFilters() aplicara el nuevo estado.
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
 
-  useEffect(() => {
-    loadPayments();
-  }, [filters.estado_general, filters.area, pagination.page]);
-
-  const loadPayments = async () => {
+  const loadPaymentsWithFilters = useCallback(async (currentFilters, page, perPage) => {
     setLoading(true);
+    setLoadError(null);
     try {
-      const params = { page: pagination.page, per_page: pagination.per_page };
-      if (filters.estado_general) {
-        params.estado_general = filters.estado_general;
-      }
-      if (filters.area) {
-        params.area = filters.area;
-      }
+      const params = { page, per_page: perPage };
+      if (currentFilters.estado_general) params.estado_general = currentFilters.estado_general;
+      if (currentFilters.area) params.area = currentFilters.area;
+
       const response = await api.getPayments(params);
-      // Handle both paginated response and legacy array response
       const items = Array.isArray(response) ? response : (response.items || []);
       const meta = !Array.isArray(response) ? response : { total: items.length, page: 1, per_page: items.length, pages: 1 };
-      
+
       setPayments(items);
       setPagination(prev => ({
         ...prev,
@@ -58,11 +55,9 @@ export default function PaymentsListPage({ user }) {
         page: meta.page || 1,
       }));
 
-      // Use workflow_states already included in the paginated response (no extra requests)
+      // workflow_states ya vienen en la respuesta paginada — sin requests extra
       const detailMap = {};
-      items.forEach(p => {
-        detailMap[p.id] = p;
-      });
+      items.forEach(p => { detailMap[p.id] = p; });
       setPaymentsDetail(detailMap);
     } catch (err) {
       console.error('Error loading payments:', err);
@@ -70,7 +65,15 @@ export default function PaymentsListPage({ user }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadPaymentsWithFilters(filters, pagination.page, pagination.per_page);
+  }, [filters.estado_general, filters.area, pagination.page]);
+
+  // Alias para compatibilidad con usos existentes en el mismo componente
+  const loadPayments = () =>
+    loadPaymentsWithFilters(filtersRef.current, pagination.page, pagination.per_page);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -82,14 +85,12 @@ export default function PaymentsListPage({ user }) {
       const results = await api.search(filters.search, filters.searchField || undefined);
       setPayments(results);
 
-      // Use workflow_states already included in the search response (no extra requests)
       const detailMap = {};
-      results.forEach(p => {
-        detailMap[p.id] = p;
-      });
+      results.forEach(p => { detailMap[p.id] = p; });
       setPaymentsDetail(detailMap);
     } catch (err) {
-      console.error('Error searching:', err);
+      console.error('Error buscando:', err);
+      setLoadError('Error en la búsqueda. Intente de nuevo.');
     }
   };
 
@@ -97,7 +98,6 @@ export default function PaymentsListPage({ user }) {
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
     setPagination(prev => ({ ...prev, page: 1 }));
-    // Update URL params
     const newParams = new URLSearchParams();
     if (newFilters.estado_general) newParams.set('estado', newFilters.estado_general);
     if (newFilters.area) newParams.set('area', newFilters.area);
@@ -111,10 +111,12 @@ export default function PaymentsListPage({ user }) {
   };
 
   const clearFilters = () => {
-    setFilters({ estado_general: '', area: '', search: '', searchField: '' });
+    const cleared = { estado_general: '', area: '', search: '', searchField: '' };
+    setFilters(cleared);
     setPagination(prev => ({ ...prev, page: 1 }));
     setSearchParams(new URLSearchParams());
-    loadPayments();
+    // Usar los filtros limpios directamente — evita leer state stale del closure anterior
+    loadPaymentsWithFilters(cleared, 1, pagination.per_page);
   };
 
   // Get pending area for a payment (only PENDIENTE, not EN_PROCESO which already acted)

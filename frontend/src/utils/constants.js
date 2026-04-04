@@ -21,6 +21,16 @@ export const AREA_ICONS = {
   sap: '☁️',
 };
 
+// Action labels per area — what the user does in each step
+export const AREA_ACTIONS = {
+  demandante: 'Cerrar',
+  validadora: 'Validar',
+  aprobadora: 'Autorizar',
+  contabilidad: 'Contabilizar',
+  pagadora: 'Pagar',
+  sap: 'Subir a SAP',
+};
+
 export const AVAILABLE_AREAS = [
   { value: 'demandante', label: '📝 Demandante' },
   { value: 'validadora', label: '✅ Validadora' },
@@ -29,3 +39,12 @@ export const AVAILABLE_AREAS = [
   { value: 'pagadora', label: '💰 Pagadora' },
   { value: 'sap', label: '☁️ SAP' },
 ];
+
+// File upload constraints — must match backend ALLOWED_EXTENSIONS in payments.py
+export const ALLOWED_FILE_EXTENSIONS = [
+  '.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp',
+  '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+  '.txt', '.csv', '.zip', '.msg',
+];
+export const MAX_FILE_SIZE_MB = 50;
+export const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;

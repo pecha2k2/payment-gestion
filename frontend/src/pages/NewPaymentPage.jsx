@@ -1,24 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../api';
-
-const MAX_FILE_SIZE_MB = 50;
-const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
-const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv', '.zip', '.msg'];
-
-const validateFile = (file) => {
-  const ext = '.' + file.name.split('.').pop().toLowerCase();
-  if (!ALLOWED_EXTENSIONS.includes(ext)) {
-    return { valid: false, error: `Tipo no permitido: ${ext}` };
-  }
-  if (file.size > MAX_FILE_SIZE_BYTES) {
-    return { valid: false, error: `Archivo demasiado grande (máx ${MAX_FILE_SIZE_MB}MB)` };
-  }
-  return { valid: true };
-};
+import { useToast } from '../components/Toast';
+import { validateFile } from '../utils/formatters';
 
 export default function NewPaymentPage({ user }) {
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({
     propuesta_gasto: '',
@@ -54,7 +42,7 @@ export default function NewPaymentPage({ user }) {
       if (result.valid) valid.push(file);
       else errors.push(`${file.name}: ${result.error}`);
     });
-    if (errors.length > 0) alert('Archivos rechazados:\n' + errors.join('\n'));
+    if (errors.length > 0) errors.forEach(e => addToast(e, 'warning'));
     if (valid.length > 0) setDocuments(prev => [...prev, ...valid]);
   };
 
@@ -80,7 +68,7 @@ export default function NewPaymentPage({ user }) {
     e.preventDefault();
 
     if (!formData.propuesta_gasto || formData.propuesta_gasto <= 0) {
-      alert('El código de propuesta de gasto es obligatorio');
+      addToast('El código de propuesta de gasto es obligatorio', 'warning');
       return;
     }
 
@@ -115,7 +103,7 @@ export default function NewPaymentPage({ user }) {
       navigate(`/payments/${payment.id}`);
     } catch (err) {
       console.error('Error creating payment:', err);
-      alert('Error creando la petición: ' + (err.message || JSON.stringify(err)));
+      addToast('Error creando la petición: ' + (err.message || ''), 'error');
       setSubmitting(false);
     }
   };
