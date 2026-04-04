@@ -59,6 +59,13 @@ def update_user(
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     update_data = user_data.model_dump(exclude_unset=True)
+
+    # Handle password separately — must be hashed before storing
+    if "password" in update_data:
+        raw_password = update_data.pop("password")
+        if raw_password:
+            user.password_hash = get_password_hash(raw_password)
+
     for field, value in update_data.items():
         setattr(user, field, value)
 

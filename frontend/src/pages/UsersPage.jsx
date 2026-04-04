@@ -81,7 +81,10 @@ export default function UsersPage() {
     e.preventDefault();
     try {
       if (editingUser) {
-        await api.updateUser(editingUser.id, formData);
+        // Omit password field entirely if left blank — backend won't change it
+        const updateData = { ...formData };
+        if (!updateData.password) delete updateData.password;
+        await api.updateUser(editingUser.id, updateData);
       } else {
         await api.createUser(formData);
       }

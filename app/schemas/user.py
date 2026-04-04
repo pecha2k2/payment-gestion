@@ -29,6 +29,14 @@ class UserUpdate(BaseModel):
     role: Optional[UserRole] = None
     area: Optional[str] = None
     active: Optional[bool] = None
+    password: Optional[str] = None
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v):
+        if v is not None and len(v) < 8:
+            raise ValueError("La contraseña debe tener al menos 8 caracteres")
+        return v
 
 
 class UserResponse(UserBase):
