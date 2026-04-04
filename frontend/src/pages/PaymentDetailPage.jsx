@@ -101,12 +101,12 @@ export default function PaymentDetailPage({ user }) {
 
     setUploadingPending(true);
     try {
-      // 1. Create a comment that acts as the audit trail for this upload
-      const fileNames = pendingDocs.map(f => f.name).join(', ');
+      // 1. Create a comment as audit trail — content is generic, the actual
+      //    filenames appear as attachments linked to this comment
       const commentResult = await api.addComment(
         id,
         area,
-        `📎 Documento adjunto: ${fileNames}`
+        '📎 Documento adjunto'
       );
       const commentId = commentResult?.id;
 
