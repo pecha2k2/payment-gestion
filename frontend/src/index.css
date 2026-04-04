@@ -1728,3 +1728,33 @@ tbody tr:hover {
     content: none !important;
   }
 }
+
+/* ──────────────────────────────────────────────────
+   Toast animation
+────────────────────────────────────────────────── */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(2rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* btn-danger (usado en modal de confirmación) */
+.btn-danger {
+  background: var(--danger, #ef4444);
+  color: white;
+  border: none;
+  padding: 0.5rem 1.25rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+.btn-danger:hover {
+  background: #dc2626;
+}

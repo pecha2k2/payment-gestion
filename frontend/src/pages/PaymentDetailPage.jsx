@@ -1,169 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api';
-import { WORKFLOW_ORDER_CON_FACTURA, WORKFLOW_ORDER_SIN_FACTURA, AREAS_DISPLAY, AREA_ICONS } from '../utils/constants';
-import { formatCurrency, getTipoPagoStr as getTipoPagoStrUtil } from '../utils/formatters';
+import { WORKFLOW_ORDER_CON_FACTURA, WORKFLOW_ORDER_SIN_FACTURA, AREAS_DISPLAY, AREA_ICONS, AREA_ACTIONS } from '../utils/constants';
+import { formatCurrency, getTipoPagoStr as getTipoPagoStrUtil, formatDate, validateFile } from '../utils/formatters';
+import { useToast } from '../components/Toast';
+import WorkflowPanel from '../components/WorkflowPanel';
+import CommentsPanel from '../components/CommentsPanel';
+import DocumentsPanel from '../components/DocumentsPanel';
 
-const AREA_ACTIONS = {
-  demandante: 'Cerrar',
-  validadora: 'Validar',
-  aprobadora: 'Autorizar',
-  contabilidad: 'Contabilizar',
-  pagadora: 'Pagar',
-  sap: 'Subir a SAP',
-};
-
-// File validation constants (must match backend)
-const MAX_FILE_SIZE_MB = 50;
-const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
-const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv', '.zip', '.msg'];
-
-// Validate file before upload
-const validateFile = (file) => {
-  const ext = '.' + file.name.split('.').pop().toLowerCase();
-  if (!ALLOWED_EXTENSIONS.includes(ext)) {
-    return { valid: false, error: `Tipo de archivo no permitido: ${ext}. Permitidos: ${ALLOWED_EXTENSIONS.join(', ')}` };
-  }
-  if (file.size > MAX_FILE_SIZE_BYTES) {
-    return { valid: false, error: `El archivo excede el límite de ${MAX_FILE_SIZE_MB} MB` };
-  }
-  return { valid: true, error: null };
-};
-
-// Handle clipboard paste for images
+// Handle clipboard paste for images — callback(file) on success, callback(null, errMsg) on error
 const handleClipboardPaste = async (e, callback) => {
   e.preventDefault();
   try {
     const clipboardItems = await navigator.clipboard.read();
-    const imageItems = clipboardItems.filter(item => 
+    const imageItems = clipboardItems.filter(item =>
       item.types.some(type => type.startsWith('image/'))
     );
-    
-    if (imageItems.length === 0) {
-      alert('No se encontró ninguna imagen en el portapapeles');
-      return;
-    }
-    
+    if (imageItems.length === 0) return; // No image in clipboard — silently ignore
     for (const item of imageItems) {
       const imageType = item.types.find(type => type.startsWith('image/'));
       const blob = await item.getType(imageType);
       const ext = imageType === 'image/png' ? '.png' : imageType === 'image/jpeg' ? '.jpg' : '.png';
-      const fileName = `pasted-image-${Date.now()}${ext}`;
-      const file = new File([blob], fileName, { type: imageType });
-      
+      const file = new File([blob], `pasted-image-${Date.now()}${ext}`, { type: imageType });
       const validation = validateFile(file);
-      if (validation.valid) {
-        callback(file);
-      } else {
-        alert(validation.error);
-      }
+      if (validation.valid) callback(file);
+      else callback(null, validation.error);
     }
   } catch (err) {
     console.error('Error reading clipboard:', err);
-    alert('No se pudo acceder al portapapeles. Asegúrate de dar permisos o usa el botón de selección de archivos.');
+    callback(null, 'No se pudo acceder al portapapeles. Asegurate de dar permisos o usá el botón de selección de archivos.');
   }
 };
 
-// Helper to extract string value from enum — delegates to shared util
 const getTipoPagoStr = getTipoPagoStrUtil;
-
-const getWorkflowDisplayEstado = (estado) => {
-  switch (estado) {
-    case 'PENDIENTE': return 'Pendiente';
-    case 'EN_PROCESO': return 'Terminado';
-    case 'APROBADO': return 'Aprobado';
-    case 'RECHAZADO': return 'Rechazado';
-    case 'REVERSADO': return 'Reversado';
-    default: return estado;
-  }
-};
-
-const formatDate = (dateStr, showTime = true) => {
-    if (!dateStr) return '-';
-    if (typeof dateStr !== 'string') return String(dateStr);
-    
-    // ISO format: 2026-03-31T00:00:00 -> 31/03/2026 00:00:00
-    if (dateStr.includes('T')) {
-      const [datePart, timePart] = dateStr.split('T');
-      const dateParts = datePart.split('-');
-      if (dateParts.length === 3) {
-        const dateFormatted = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
-        if (!showTime) return dateFormatted;
-        const time = timePart ? timePart.split('.')[0] : '00:00:00';
-        return `${dateFormatted} ${time}`;
-      }
-    }
-    
-    // dd/mm/yyyy or similar
-    if (dateStr.includes('/')) {
-      const parts = dateStr.split('/');
-      if (parts.length === 3) {
-        return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2].split(' ')[0]}`;
-      }
-    }
-    
-    return dateStr;
-  };
-
-// Component to display image preview in comments
-function CommentImagePreview({ doc, onDownload }) {
-  const [imageUrl, setImageUrl] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    const loadImage = async () => {
-      try {
-        // Get ephemeral token for document
-        const { token } = await api.requestDocumentToken(doc.id);
-        // Fetch image as blob
-        const response = await fetch(`/api/documents/public/${doc.id}/view?token=${token}`);
-        if (!response.ok) throw new Error('Failed to load image');
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        setImageUrl(url);
-      } catch (err) {
-        console.error('Error loading image:', err);
-        setError(err.message || 'Error cargando imagen');
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadImage();
-    
-    return () => {
-      if (imageUrl) URL.revokeObjectURL(imageUrl);
-    };
-  }, [doc.id]);
-
-  if (loading) return <span style={{ fontSize: '0.75rem', color: '#999' }}>Cargando imagen...</span>;
-  if (error) return <span style={{ fontSize: '0.75rem', color: '#c00' }}>{error}</span>;
-  if (!imageUrl) return <span style={{ fontSize: '0.75rem', color: '#999' }}>Error cargando imagen</span>;
-
-  return (
-    <div style={{ display: 'inline-block' }}>
-      <img
-        src={imageUrl}
-        alt={doc.nombre_original}
-        style={{ maxWidth: '200px', maxHeight: '200px', borderRadius: '4px', border: '1px solid #ddd', cursor: 'pointer' }}
-        onClick={() => onDownload(doc.id, doc.nombre_original)}
-        title="Clic para descargar"
-      />
-      <span style={{ fontSize: '0.7rem', color: '#666', display: 'block', marginTop: '2px' }}>
-        📎 {doc.nombre_original}
-      </span>
-    </div>
-  );
-}
 
 export default function PaymentDetailPage({ user }) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { addToast, showConfirm } = useToast();
   const [payment, setPayment] = useState(null);
   const [workflowStates, setWorkflowStates] = useState([]);
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [uploadingDoc, setUploadingDoc] = useState(false);
+
   const [newComment, setNewComment] = useState('');
   const [commentArea, setCommentArea] = useState(null);
   const [addingComment, setAddingComment] = useState(false);
@@ -192,7 +71,7 @@ export default function PaymentDetailPage({ user }) {
       setComments(data.comments || []);
     } catch (err) {
       console.error('Error loading payment:', err);
-      alert('Error cargando la petición');
+      addToast('Error cargando la petición', 'error');
       navigate('/payments');
     } finally {
       setLoading(false);
@@ -216,10 +95,10 @@ export default function PaymentDetailPage({ user }) {
       setPendingDocs([]);
       setDocUploadModal(false);
       loadPayment();
-      alert('Documento(s) subido(s) correctamente');
+      addToast('Documento(s) subido(s) correctamente', 'success');
     } catch (err) {
       console.error('Error uploading:', err);
-      alert('Error subiendo el documento');
+      addToast('Error subiendo el documento', 'error');
     } finally {
       setUploadingPending(false);
     }
@@ -242,7 +121,7 @@ export default function PaymentDetailPage({ user }) {
 
   const handleAdvance = async () => {
     if (!actionComment.trim()) {
-      alert('Debes escribir un comentario para avanzar el workflow');
+      addToast('Debes escribir un comentario para avanzar el workflow', 'warning');
       return;
     }
     setActionLoading(true);
@@ -266,9 +145,10 @@ export default function PaymentDetailPage({ user }) {
       setActionComment('');
       setActionDocuments([]);
       loadPayment();
+      addToast('Workflow avanzado correctamente', 'success');
     } catch (err) {
       console.error('Error advancing:', err);
-      alert('Error avanzando el workflow');
+      addToast(err.message || 'Error avanzando el workflow', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -276,7 +156,7 @@ export default function PaymentDetailPage({ user }) {
 
   const handleReverse = async () => {
     if (!actionComment.trim()) {
-      alert('Debes escribir un motivo para revertir');
+      addToast('Debes escribir un motivo para revertir', 'warning');
       return;
     }
     setActionLoading(true);
@@ -285,9 +165,10 @@ export default function PaymentDetailPage({ user }) {
       setActionModal(null);
       setActionComment('');
       loadPayment();
+      addToast('Workflow revertido', 'info');
     } catch (err) {
       console.error('Error reversing:', err);
-      alert('Error revirtiendo el workflow');
+      addToast(err.message || 'Error revirtiendo el workflow', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -295,7 +176,7 @@ export default function PaymentDetailPage({ user }) {
 
   const handleAddComment = async (area) => {
     if (!newComment.trim() || !area) {
-      alert('Debes escribir un comentario');
+      addToast('Debes escribir un comentario', 'warning');
       return;
     }
     setAddingComment(true);
@@ -306,22 +187,12 @@ export default function PaymentDetailPage({ user }) {
       setCommentArea(null);
       setCommentDoc(null);
       loadPayment();
+      addToast('Comentario añadido', 'success');
     } catch (err) {
       console.error('Error adding comment:', err);
-      alert('Error añadiendo comentario');
+      addToast('Error añadiendo comentario', 'error');
     } finally {
       setAddingComment(false);
-    }
-  };
-
-  const handleDeleteDocument = async (docId) => {
-    if (!confirm('¿Eliminar este documento?')) return;
-    try {
-      await api.deleteDocument(docId);
-      loadPayment();
-    } catch (err) {
-      console.error('Error deleting:', err);
-      alert('Error eliminando documento');
     }
   };
 
@@ -341,29 +212,31 @@ export default function PaymentDetailPage({ user }) {
       window.URL.revokeObjectURL(blobUrl);
     } catch (err) {
       console.error('Error downloading:', err);
-      alert('Error descargando documento');
+      addToast('Error descargando documento', 'error');
     }
   };
 
   const handleCancel = async () => {
-    if (!confirm('¿Cancelar esta petición? Esta acción no se puede deshacer.')) return;
+    const confirmed = await showConfirm('¿Cancelar esta petición? Esta acción no se puede deshacer.');
+    if (!confirmed) return;
     try {
       await api.cancelPayment(id);
       navigate('/payments');
     } catch (err) {
       console.error('Error canceling:', err);
-      alert('Error cancelando la petición');
+      addToast('Error cancelando la petición', 'error');
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm('¿Eliminar esta petición definitivamente? Esta acción no se puede deshacer.')) return;
+    const confirmed = await showConfirm('¿Eliminar esta petición definitivamente? Esta acción no se puede deshacer.');
+    if (!confirmed) return;
     try {
       await api.deletePayment(id);
       navigate('/payments');
     } catch (err) {
       console.error('Error deleting:', err);
-      alert('Error eliminando la petición');
+      addToast('Error eliminando la petición', 'error');
     }
   };
 
@@ -427,20 +300,16 @@ export default function PaymentDetailPage({ user }) {
       await api.updatePayment(id, updateData);
       setEditingPayment(false);
       loadPayment();
-      alert('Petición actualizada correctamente');
+      addToast('Petición actualizada correctamente', 'success');
     } catch (err) {
       console.error('Error updating:', err);
-      alert('Error actualizando la petición: ' + (err.message || JSON.stringify(err)));
+      addToast('Error actualizando la petición: ' + (err.message || ''), 'error');
     }
   };
 
   const handleCancelEdit = () => {
     setEditingPayment(false);
     setEditForm({});
-  };
-
-  const isPdf = (mimeType) => {
-    return mimeType && mimeType.includes('pdf');
   };
 
   const getMedioPagoDisplay = (medio) => {
@@ -749,204 +618,35 @@ export default function PaymentDetailPage({ user }) {
 
         {/* Column 2: Workflow */}
         <div className="workflow-column">
-          <div className="card">
-            <h3 className="card-title">Workflow</h3>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-              {getTipoPagoStr(payment?.tipo_pago) === 'SIN_FACTURA' ? 'Flujo sin factura' : 'Flujo con factura'}
-            </div>
-            <div className="workflow-timeline">
-              {sortedWorkflowStates.map((state, index) => {
-                const areaComments = commentsByArea[state.area] || [];
-                const hasActed = state.estado !== 'PENDIENTE' || areaComments.length > 0;
-                const canReverse = hasActed && state.estado !== 'RECHAZADO';
-                // Use server-computed accessible_areas — eliminates frontend/backend role mapping duplication
-                const userAreas = user?.accessible_areas || [];
-                const canAct = userAreas.includes(state.area);
-                return (
-                  <React.Fragment key={state.area}>
-                    <div className={`workflow-step ${state.estado.toLowerCase()}`}>
-                      <div className="workflow-step-header">
-                        <div className="workflow-step-icon">{AREA_ICONS[state.area]}</div>
-                        <div className="workflow-step-info">
-                          <div className="workflow-step-name">{AREAS_DISPLAY[state.area]}</div>
-                          <div className="workflow-step-status">{getWorkflowDisplayEstado(state.estado)}</div>
-                        </div>
-                        <div className="flex gap-1 items-center">
-                          {payment.estado_general !== 'CANCELADA' && payment.estado_general !== 'COMPLETADA' && canAct && state.estado !== 'APROBADO' && state.estado !== 'RECHAZADO' && (
-                            <button
-                              className="btn btn-success"
-                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-                              onClick={() => setActionModal({ type: 'advance', area: state.area })}
-                            >
-                              {AREA_ACTIONS[state.area] || 'Avanzar'}
-                            </button>
-                          )}
-                          {payment.estado_general !== 'CANCELADA' && payment.estado_general !== 'COMPLETADA' && canReverse && canAct && (
-                            <button
-                              className="btn btn-danger"
-                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-                              onClick={() => setActionModal({ type: 'reverse', area: state.area })}
-                              title="Revertir"
-                            >
-                              ↩
-                            </button>
-                          )}
-                          {hasActed && (
-                            <span style={{ color: 'var(--success)', fontWeight: 'bold', fontSize: '1rem' }} title="Completado">✓</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    {index < sortedWorkflowStates.length - 1 && (
-                      <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.7rem', padding: '2px 0' }}>
-                        ↓
-                      </div>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </div>
-          </div>
+          <WorkflowPanel
+            payment={payment}
+            workflowStates={workflowStates}
+            commentsByArea={commentsByArea}
+            areasOrder={getAreasOrder()}
+            user={user}
+            onOpenAction={(type, area) => setActionModal({ type, area })}
+            tipoPagoLabel={getTipoPagoStr(payment?.tipo_pago) === 'SIN_FACTURA' ? 'Flujo sin factura' : 'Flujo con factura'}
+          />
         </div>
 
         {/* Column 3: Comentarios */}
         <div className="comments-column">
-          <div className="card">
-            <h3 className="card-title">Comentarios</h3>
-
-            <div className="comments-list">
-              {getAreasOrder().map(area => {
-                const areaComments = commentsByArea[area] || [];
-                if (areaComments.length === 0) return null;
-                return (
-                  <div key={area} className="comment-area-section">
-                    <div className="comment-area-title">
-                      {AREA_ICONS[area]} {AREAS_DISPLAY[area]}
-                    </div>
-                    {areaComments.map((comment) => (
-                      <div key={comment.id} className="comment">
-                        <div className="comment-header">
-                          <span className="comment-author">
-                            {comment.usuario?.nombre || comment.usuario?.username || 'Usuario'}
-                            {comment.usuario?.email && <span style={{ fontWeight: 'normal', fontSize: '0.8em', marginLeft: '0.5em' }}>({comment.usuario.email})</span>}
-                          </span>
-                          <span className="comment-date">{formatDate(comment.created_at)}</span>
-                        </div>
-                        <div className="comment-content">
-                          {comment.contenido.split('\n').map((line, i, arr) => (
-                            <React.Fragment key={i}>
-                              {line}
-                              {i < arr.length - 1 && <br />}
-                            </React.Fragment>
-                          ))}
-                        </div>
-                         {comment.documentos && comment.documentos.length > 0 && (
-                          <div className="comment-attachments mt-2">
-                            <strong style={{ fontSize: '0.75rem', display: 'block', marginBottom: '4px' }}>Documentos adjuntos:</strong>
-                            <div className="flex flex-wrap gap-2">
-                              {comment.documentos.map(doc => (
-                                <div key={doc.id}>
-                                  {doc.mime_type?.startsWith('image/') ? (
-                                    <CommentImagePreview doc={doc} onDownload={handleDownloadDocument} />
-                                  ) : (
-                                    <button className="btn btn-secondary btn-sm" onClick={() => handleDownloadDocument(doc.id, doc.nombre_original)}>
-                                      📎 {doc.nombre_original}
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-              {comments.length === 0 && (
-                <div className="empty-state">
-                  <p>No hay comentarios</p>
-                </div>
-              )}
-            </div>
-          </div>
+          <CommentsPanel
+            comments={comments}
+            commentsByArea={commentsByArea}
+            areasOrder={getAreasOrder()}
+            onDownload={handleDownloadDocument}
+          />
         </div>
       </div>
 
       {/* Documents section - outside 3-column layout */}
-      <div className="card mt-3">
-        <div className="card-header">
-          <h3 className="card-title">Documentos</h3>
-          <div className="flex gap-1">
-            <button
-              className="btn btn-secondary"
-              onClick={async () => {
-                try {
-                  const url = await api.downloadAllDocuments(id);
-                  const link = document.createElement('a');
-                  link.href = url;
-                  link.download = `documentos_${payment.numero_peticion}.zip`;
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                } catch (err) {
-                  console.error('Error descargando ZIP:', err);
-                  alert('Error al descargar los documentos');
-                }
-              }}
-            >
-              📦 Descargar todos
-            </button>
-            <button className="btn btn-primary" onClick={() => setDocUploadModal(true)}>
-              + Subir Documentos
-            </button>
-          </div>
-        </div>
-        {payment.documents && payment.documents.length > 0 ? (
-          <div>
-            {payment.documents.map((doc) => (
-              <div key={doc.id} className="document-item">
-                <div className="document-icon">📄</div>
-                <div className="document-info">
-                  <div className="document-name">{doc.nombre_original}</div>
-                  <div className="document-meta">
-                    Tipo: {doc.tipo} | Tamaño: {(doc.tamano_bytes / 1024).toFixed(1)} KB | {formatDate(doc.uploaded_at)}
-                    {doc.n_documento_contable && ` | NDoc: ${doc.n_documento_contable}`}
-                  </div>
-                </div>
-                <div className="document-actions">
-                  {isPdf(doc.mime_type) && (
-                    <button
-                      className="btn btn-primary"
-                      onClick={async () => {
-                        try {
-                          const url = await api.viewDocument(doc.id);
-                          window.open(url, '_blank', 'noopener,noreferrer');
-                        } catch (err) {
-                          console.error('Error obteniendo token de documento:', err);
-                          alert('Error abriendo el documento. Intentá de nuevo.');
-                        }
-                      }}
-                    >
-                      Ver
-                    </button>
-                  )}
-                  <button className="btn btn-secondary" onClick={() => handleDownloadDocument(doc.id, doc.nombre_original)}>
-                    Descargar
-                  </button>
-                  {user?.role === 'admin' && (
-                      <button className="btn btn-danger" onClick={() => handleDeleteDocument(doc.id)}>Eliminar</button>
-                    )}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state">
-            <p>No hay documentos</p>
-          </div>
-        )}
-      </div>
+      <DocumentsPanel
+        payment={payment}
+        user={user}
+        onRefresh={loadPayment}
+        onOpenUpload={() => setDocUploadModal(true)}
+      />
 
       {/* Action Modal */}
       {actionModal && (
@@ -955,7 +655,10 @@ export default function PaymentDetailPage({ user }) {
           onPaste={(e) => {
             // Global paste handler for the entire modal
             if (actionModal.type === 'advance') {
-              handleClipboardPaste(e, (file) => setActionDocuments(prev => [...prev, file]));
+              handleClipboardPaste(e, (file, err) => {
+                if (err) { addToast(err, 'error'); return; }
+                if (file) setActionDocuments(prev => [...prev, file]);
+              });
             }
           }}
         >
@@ -984,7 +687,7 @@ export default function PaymentDetailPage({ user }) {
                       if (validation.valid) {
                         validFiles.push(file);
                       } else {
-                        alert(`${file.name}: ${validation.error}`);
+                        addToast(`${file.name}: ${validation.error}`, 'warning');
                       }
                     }
                     if (validFiles.length > 0) setActionDocuments(prev => [...prev, ...validFiles]);
@@ -1012,7 +715,7 @@ export default function PaymentDetailPage({ user }) {
                       if (validation.valid) {
                         validFiles.push(file);
                       } else {
-                        alert(`${file.name}: ${validation.error}`);
+                        addToast(`${file.name}: ${validation.error}`, 'warning');
                       }
                     }
                     if (validFiles.length > 0) setActionDocuments(prev => [...prev, ...validFiles]);

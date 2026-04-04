@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 import os
 import pathlib
 import hashlib
+import uuid
 
 from sqlalchemy import func
 from app.database import get_db
@@ -265,7 +266,12 @@ async def upload_document(
             status_code=400, detail=f"Tipo MIME no permitido: {file.content_type}"
         )
 
-    file_path = os.path.join(payment_dir, original_filename)
+    # Append a short UUID suffix to prevent silent overwrites when uploading
+    # two files with the same name to the same payment.
+    stem = pathlib.Path(original_filename).stem
+    unique_suffix = uuid.uuid4().hex[:8]
+    storage_filename = f"{stem}_{unique_suffix}{ext}"
+    file_path = os.path.join(payment_dir, storage_filename)
 
     # Defense in depth: ensure file_path stays within payment_dir
     if os.path.commonpath(
@@ -288,7 +294,9 @@ async def upload_document(
     with open(file_path, "wb") as f:
         f.write(content)
 
-    # Create document record
+    # Create document record.
+    # nombre_original preserves the user-facing name (what they uploaded).
+    # ruta_storage uses the unique storage_filename to prevent overwrites.
     document = Document(
         payment_request_id=payment_id,
         tipo=tipo,

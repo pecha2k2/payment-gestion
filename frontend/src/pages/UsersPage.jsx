@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
+import { useToast } from '../components/Toast';
 
 const ROLES = [
   { value: 'admin', label: 'Administrador' },
@@ -12,6 +13,7 @@ const ROLES = [
 ];
 
 export default function UsersPage() {
+  const { addToast, showConfirm } = useToast();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -85,30 +87,35 @@ export default function UsersPage() {
       }
       setShowModal(false);
       loadUsers();
+      addToast(editingUser ? 'Usuario actualizado' : 'Usuario creado', 'success');
     } catch (err) {
       console.error('Error saving user:', err);
-      alert('Error guardando usuario: ' + err.message);
+      addToast('Error guardando usuario: ' + err.message, 'error');
     }
   };
 
   const handleDelete = async (userId) => {
-    if (!confirm('¿Eliminar este usuario definitivamente? Esta acción no se puede deshacer.')) return;
+    const confirmed = await showConfirm('¿Eliminar este usuario definitivamente? Esta acción no se puede deshacer.');
+    if (!confirmed) return;
     try {
       await api.deleteUser(userId);
       loadUsers();
+      addToast('Usuario eliminado', 'success');
     } catch (err) {
       console.error('Error deleting user:', err);
-      alert('Error eliminando usuario');
+      addToast('Error eliminando usuario', 'error');
     }
   };
 
   const handleReactivate = async (userId) => {
-    if (!confirm('¿Reactivar este usuario?')) return;
+    const confirmed = await showConfirm('¿Reactivar este usuario?');
+    if (!confirmed) return;
     try {
       await api.reactivateUser(userId);
       loadUsers();
+      addToast('Usuario reactivado', 'success');
     } catch (err) {
-      alert('Error reactivando usuario: ' + err.message);
+      addToast('Error reactivando usuario: ' + err.message, 'error');
     }
   };
 

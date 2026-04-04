@@ -186,36 +186,6 @@ def _apply_payment_filters(
     return query
 
 
-def get_payments(
-    db: Session,
-    skip: int = 0,
-    limit: int = 100,
-    estado_general: Optional[str] = None,
-    area: Optional[str] = None,
-    numero_peticion: Optional[str] = None,
-    propuesta_gasto: Optional[str] = None,
-    orden_pago: Optional[str] = None,
-    numero_factura: Optional[str] = None,
-    n_documento_contable: Optional[str] = None,
-    fecha_pago: Optional[str] = None,
-) -> List[PaymentRequest]:
-    query = _apply_payment_filters(
-        db.query(PaymentRequest),
-        db,
-        estado_general,
-        area,
-        numero_peticion,
-        propuesta_gasto,
-        orden_pago,
-        numero_factura,
-        n_documento_contable,
-        fecha_pago,
-    )
-    return (
-        query.order_by(PaymentRequest.created_at.desc()).offset(skip).limit(limit).all()
-    )
-
-
 def get_payments_paginated(
     db: Session,
     skip: int = 0,
