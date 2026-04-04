@@ -90,7 +90,6 @@ export default function CommentsPanel({ comments, commentsByArea, areasOrder, on
                         </span>
                       )}
                     </span>
-                    <span className="comment-date">{formatDate(comment.created_at)}</span>
                   </div>
                   <div className="comment-content">
                     {comment.contenido.split('\n').map((line, i, arr) => (
@@ -123,6 +122,9 @@ export default function CommentsPanel({ comments, commentsByArea, areasOrder, on
                       </div>
                     </div>
                   )}
+                  <div style={{ textAlign: 'right', marginTop: '0.4rem' }}>
+                    <span className="comment-date">{formatDate(comment.created_at)}</span>
+                  </div>
                 </div>
               ))}
             </div>

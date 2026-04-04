@@ -119,29 +119,17 @@ export default function PaymentsListPage({ user }) {
     loadPaymentsWithFilters(cleared, 1, pagination.per_page);
   };
 
-  // Get pending area for a payment (only PENDIENTE, not EN_PROCESO which already acted)
-  const getPendingArea = (paymentId) => {
-    const detail = paymentsDetail[paymentId];
+  // Get the FIRST pending area respecting the configured flow order
+  const getPendingArea = (payment) => {
+    const detail = paymentsDetail[payment.id];
     if (!detail || !detail.workflow_states) return null;
-    // Find first PENDIENTE state
-    const pending = detail.workflow_states.find(s => s.estado === 'PENDIENTE');
-    return pending ? pending.area : null;
-  };
-
-  // Get pending area workflow estado
-  const getPendingAreaEstado = (paymentId) => {
-    const detail = paymentsDetail[paymentId];
-    if (!detail || !detail.workflow_states) return null;
-    // Find first PENDIENTE state
-    const pending = detail.workflow_states.find(s => s.estado === 'PENDIENTE');
-    if (!pending) return null;
-    switch (pending.estado) {
-      case 'PENDIENTE': return 'Pendiente';
-      case 'EN_PROCESO': return 'Terminado';
-      case 'APROBADO': return 'Aprobado';
-      case 'RECHAZADO': return 'Rechazado';
-      default: return pending.estado;
+    const order = getWorkflowOrderForPayment(payment);
+    // Walk the flow order and return the first area that is still PENDIENTE
+    for (const area of order) {
+      const state = detail.workflow_states.find(s => s.area === area);
+      if (state && state.estado === 'PENDIENTE') return area;
     }
+    return null;
   };
 
   const getAreaLabel = (area) => {
@@ -279,8 +267,7 @@ export default function PaymentsListPage({ user }) {
               </thead>
               <tbody>
                 {payments.map(payment => {
-                  const pendingArea = getPendingArea(payment.id);
-                  const pendingEstado = getPendingAreaEstado(payment.id);
+                  const pendingArea = getPendingArea(payment);
                   return (
                     <tr key={payment.id}>
                       <td><Link to={`/payments/${payment.id}`} style={{ color: '#fbbf24', fontWeight: 'bold' }}>{payment.numero_peticion}</Link></td>
