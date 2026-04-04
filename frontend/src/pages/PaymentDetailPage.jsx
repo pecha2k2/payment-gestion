@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api';
-import { WORKFLOW_ORDER_CON_FACTURA, WORKFLOW_ORDER_SIN_FACTURA, AREAS_DISPLAY, AREA_ICONS, AREA_ACTIONS } from '../utils/constants';
+import { WORKFLOW_ORDER_CON_FACTURA, WORKFLOW_ORDER_SIN_FACTURA, AREAS_DISPLAY, AREA_ICONS, AREA_ACTIONS, AVAILABLE_AREAS } from '../utils/constants';
 import { formatCurrency, getTipoPagoStr as getTipoPagoStrUtil, formatDate, validateFile } from '../utils/formatters';
 import { useToast } from '../components/Toast';
 import WorkflowPanel from '../components/WorkflowPanel';
@@ -58,6 +58,8 @@ export default function PaymentDetailPage({ user }) {
   const [pendingDocs, setPendingDocs] = useState([]);
   const [pendingDragOver, setPendingDragOver] = useState(false);
   const [uploadingPending, setUploadingPending] = useState(false);
+  // For the "Subir Documentos" modal: which area to register the upload under
+  const [uploadArea, setUploadArea] = useState('');
 
   useEffect(() => {
     loadPayment();
@@ -87,15 +89,41 @@ export default function PaymentDetailPage({ user }) {
 
   const uploadPendingDocs = async () => {
     if (pendingDocs.length === 0) return;
+
+    // Determine the area for this upload:
+    // - admin must have selected one explicitly (uploadArea)
+    // - other roles use their first accessible area
+    const area = uploadArea || user?.accessible_areas?.[0];
+    if (!area) {
+      addToast('Seleccioná un área para registrar el documento', 'warning');
+      return;
+    }
+
     setUploadingPending(true);
     try {
+      // 1. Create a comment that acts as the audit trail for this upload
+      const fileNames = pendingDocs.map(f => f.name).join(', ');
+      const commentResult = await api.addComment(
+        id,
+        area,
+        `📎 Documento adjunto: ${fileNames}`
+      );
+      const commentId = commentResult?.id;
+
+      // 2. Upload each file linked to that comment
       for (const file of pendingDocs) {
-        await api.uploadDocument(id, file, 'peticion', '');
+        if (commentId) {
+          await api.uploadDocumentWithComment(id, commentId, file, 'peticion', '');
+        } else {
+          await api.uploadDocument(id, file, 'peticion', '');
+        }
       }
+
       setPendingDocs([]);
+      setUploadArea('');
       setDocUploadModal(false);
       loadPayment();
-      addToast('Documento(s) subido(s) correctamente', 'success');
+      addToast('Documento(s) subido(s) y registrado(s) correctamente', 'success');
     } catch (err) {
       console.error('Error uploading:', err);
       addToast('Error subiendo el documento', 'error');
@@ -792,8 +820,34 @@ export default function PaymentDetailPage({ user }) {
           <div className="modal">
             <div className="modal-header">
               <h3 className="modal-title">Subir Documentos</h3>
-              <button className="modal-close" onClick={() => { setDocUploadModal(false); setPendingDocs([]); }}>×</button>
+              <button className="modal-close" onClick={() => { setDocUploadModal(false); setPendingDocs([]); setUploadArea(''); }}>×</button>
             </div>
+
+            {/* Área — admin elige, resto ve la suya */}
+            <div className="form-group">
+              <label className="form-label">Área que registra el documento</label>
+              {user?.role === 'admin' ? (
+                <select
+                  className="form-select"
+                  value={uploadArea}
+                  onChange={(e) => setUploadArea(e.target.value)}
+                  required
+                >
+                  <option value="">Seleccionar área...</option>
+                  {AVAILABLE_AREAS.map(a => (
+                    <option key={a.value} value={a.value}>{a.label}</option>
+                  ))}
+                </select>
+              ) : (
+                <div style={{ padding: '0.5rem 0', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                  {AREA_ICONS[user?.accessible_areas?.[0]]} {AREAS_DISPLAY[user?.accessible_areas?.[0]] || user?.accessible_areas?.[0]}
+                  <span style={{ fontSize: '0.75rem', marginLeft: '0.5rem', color: 'var(--text-muted)' }}>
+                    (se registrará en esta área)
+                  </span>
+                </div>
+              )}
+            </div>
+
             <div className="form-group">
               <div
                 className={`upload-zone ${pendingDragOver ? 'dragover' : ''}`}
@@ -833,8 +887,12 @@ export default function PaymentDetailPage({ user }) {
               )}
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => { setDocUploadModal(false); setPendingDocs([]); }}>Cancelar</button>
-              <button className="btn btn-primary" onClick={uploadPendingDocs} disabled={uploadingPending || pendingDocs.length === 0}>
+              <button className="btn btn-secondary" onClick={() => { setDocUploadModal(false); setPendingDocs([]); setUploadArea(''); }}>Cancelar</button>
+              <button
+                className="btn btn-primary"
+                onClick={uploadPendingDocs}
+                disabled={uploadingPending || pendingDocs.length === 0 || (user?.role === 'admin' && !uploadArea)}
+              >
                 {uploadingPending ? 'Subiendo...' : `Subir ${pendingDocs.length} archivo(s)`}
               </button>
             </div>
