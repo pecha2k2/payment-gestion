@@ -124,16 +124,17 @@ def list_payments(
     skip = (page - 1) * per_page
     total, items = payment_service.get_payments_paginated(
         db,
+        current_user,
         skip,
         per_page,
-        estado_general,
-        area,
-        numero_peticion,
-        propuesta_gasto,
-        orden_pago,
-        numero_factura,
-        n_documento_contable,
-        fecha_pago,
+        estado_general=estado_general,
+        area=area,
+        numero_peticion=numero_peticion,
+        propuesta_gasto=propuesta_gasto,
+        orden_pago=orden_pago,
+        numero_factura=numero_factura,
+        n_documento_contable=n_documento_contable,
+        fecha_pago=fecha_pago,
     )
     pages = (total + per_page - 1) // per_page if per_page > 0 else 0
     return PaginatedResponse(
@@ -158,7 +159,7 @@ def get_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    payment = payment_service.get_payment_by_id(db, payment_id)
+    payment = payment_service.get_payment_by_id(db, payment_id, current_user)
     if not payment:
         raise HTTPException(status_code=404, detail="Petición de pago no encontrada")
     return payment
@@ -171,7 +172,7 @@ def update_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    payment = payment_service.get_payment_by_id(db, payment_id)
+    payment = payment_service.get_payment_by_id(db, payment_id, current_user)
     if not payment:
         raise HTTPException(status_code=404, detail="Petición de pago no encontrada")
     if payment.creadora_id != current_user.id and current_user.role.value != "admin":
@@ -190,7 +191,7 @@ def delete_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    payment = payment_service.get_payment_by_id(db, payment_id)
+    payment = payment_service.get_payment_by_id(db, payment_id, current_user)
     if not payment:
         raise HTTPException(status_code=404, detail="Petición de pago no encontrada")
 
@@ -216,7 +217,7 @@ def cancel_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    payment = payment_service.get_payment_by_id(db, payment_id)
+    payment = payment_service.get_payment_by_id(db, payment_id, current_user)
     if not payment:
         raise HTTPException(status_code=404, detail="Petición de pago no encontrada")
 
@@ -245,7 +246,7 @@ async def upload_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    payment = payment_service.get_payment_by_id(db, payment_id)
+    payment = payment_service.get_payment_by_id(db, payment_id, current_user)
     if not payment:
         raise HTTPException(status_code=404, detail="Petición de pago no encontrada")
 

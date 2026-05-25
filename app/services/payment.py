@@ -6,7 +6,7 @@ import logging
 import os
 
 from app.models.payment import PaymentRequest, Document
-from app.models.workflow import WorkflowState, WorkflowConfig, WorkflowEstado, Area
+from app.models.workflow import WorkflowState, WorkflowConfig, WorkflowEstado, Area, Comment
 from app.models.user import User, UserRole
 from app.schemas.payment import PaymentRequestCreate, PaymentRequestUpdate
 from app.services.workflow import AREA_TO_ROLES, _parse_flujo_json
@@ -140,6 +140,7 @@ def create_payment_request(
 def _apply_payment_filters(
     query,
     db: Session,
+    current_user: Optional[User],
     estado_general: Optional[str],
     area: Optional[str],
     numero_peticion: Optional[str],
@@ -149,6 +150,25 @@ def _apply_payment_filters(
     n_documento_contable: Optional[str],
     fecha_pago: Optional[str],
 ):
+    if current_user and current_user.role.value != "admin":
+        if current_user.role.value == "demandante":
+            query = query.filter(PaymentRequest.creadora_id == current_user.id)
+        else:
+            query = query.filter(
+                (PaymentRequest.creadora_id == current_user.id) |
+                PaymentRequest.id.in_(
+                    db.query(WorkflowState.payment_request_id).filter(
+                        (WorkflowState.usuario_asignado_id == current_user.id) |
+                        (WorkflowState.usuario_completo_id == current_user.id)
+                    )
+                ) |
+                PaymentRequest.id.in_(
+                    db.query(Comment.payment_request_id).filter(
+                        Comment.usuario_id == current_user.id
+                    )
+                )
+            )
+
     if estado_general:
         query = query.filter(PaymentRequest.estado_general == estado_general)
     if area:
@@ -188,6 +208,7 @@ def _apply_payment_filters(
 
 def get_payments_paginated(
     db: Session,
+    current_user: Optional[User],
     skip: int = 0,
     limit: int = 20,
     estado_general: Optional[str] = None,
@@ -208,6 +229,7 @@ def get_payments_paginated(
     query = _apply_payment_filters(
         base_query,
         db,
+        current_user,
         estado_general,
         area,
         numero_peticion,
@@ -224,19 +246,39 @@ def get_payments_paginated(
     return total, items
 
 
-def get_payment_by_id(db: Session, payment_id: int) -> Optional[PaymentRequest]:
-    from app.models.workflow import Comment
-
+def get_payment_by_id(
+    db: Session, payment_id: int, current_user: Optional[User] = None
+) -> Optional[PaymentRequest]:
     # Use selectinload for workflow_states, comments and their documents
-    return (
+    query = (
         db.query(PaymentRequest)
         .options(
             selectinload(PaymentRequest.workflow_states),
             selectinload(PaymentRequest.comments).selectinload(Comment.documentos),
         )
         .filter(PaymentRequest.id == payment_id)
-        .first()
     )
+
+    if current_user and current_user.role.value != "admin":
+        if current_user.role.value == "demandante":
+            query = query.filter(PaymentRequest.creadora_id == current_user.id)
+        else:
+            query = query.filter(
+                (PaymentRequest.creadora_id == current_user.id) |
+                PaymentRequest.id.in_(
+                    db.query(WorkflowState.payment_request_id).filter(
+                        (WorkflowState.usuario_asignado_id == current_user.id) |
+                        (WorkflowState.usuario_completo_id == current_user.id)
+                    )
+                ) |
+                PaymentRequest.id.in_(
+                    db.query(Comment.payment_request_id).filter(
+                        Comment.usuario_id == current_user.id
+                    )
+                )
+            )
+
+    return query.first()
 
 
 def delete_payment(db: Session, payment_id: int, numero_peticion: str) -> None:
