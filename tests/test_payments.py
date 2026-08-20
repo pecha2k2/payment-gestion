@@ -258,3 +258,46 @@ async def test_admin_full_access(client, db_session):
     assert response1.status_code == 200
     response2 = await client.get(f"/api/payments/{p2.id}", headers=headers_admin)
     assert response2.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_search_returns_workflow_states(client, db_session):
+    demandante = create_test_user(db_session, "search_owner", UserRole.demandante)
+    payment = PaymentRequest(
+        numero_peticion="PAY-2026-SEARCH",
+        propuesta_gasto=54321,
+        tipo_pago=TipoPago.CON_FACTURA,
+        medio_pago=MedioPago.TRANSFERENCIA,
+        estado_general=EstadoGeneral.ABIERTA,
+        monto_total=150.00,
+        divisa=Divisa.EUR,
+        creadora_id=demandante.id,
+        created_at=datetime.now(timezone.utc),
+    )
+    db_session.add(payment)
+    db_session.flush()
+    db_session.add(
+        WorkflowState(
+            payment_request_id=payment.id,
+            area=Area.validadora,
+            estado=WorkflowEstado.PENDIENTE,
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    db_session.commit()
+
+    response = await client.get(
+        "/api/search",
+        params={"q": "PAY-2026-SEARCH", "field": "numero_peticion"},
+        headers=get_auth_headers(demandante.username),
+    )
+
+    assert response.status_code == 200
+    results = response.json()
+    assert len(results) == 1
+    assert results[0]["numero_peticion"] == payment.numero_peticion
+    states = results[0]["workflow_states"]
+    assert len(states) == 1
+    assert states[0]["payment_request_id"] == payment.id
+    assert states[0]["area"] == "validadora"
+    assert states[0]["estado"] == "PENDIENTE"
