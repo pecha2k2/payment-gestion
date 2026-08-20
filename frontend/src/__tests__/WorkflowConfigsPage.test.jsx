@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { api } from "../api";
 import WorkflowConfigsPage from "../pages/WorkflowConfigsPage";
 
@@ -22,6 +22,29 @@ describe("WorkflowConfigsPage", () => {
         activo: true,
       },
     ]);
+  });
+
+  it("renders a valid persisted workflow preview", async () => {
+    api.getWorkflowConfigs.mockResolvedValueOnce([
+      {
+        id: 2,
+        nombre: "Flujo válido",
+        descripcion: "",
+        tipo_pago: "CON_FACTURA",
+        es_default: true,
+        flujo_json: '["demandante", "validadora"]',
+        activo: true,
+      },
+    ]);
+
+    render(<WorkflowConfigsPage />);
+
+    const configName = await screen.findByText("Flujo válido");
+    const row = configName.closest("tr");
+
+    expect(within(row).getByText(/demandante/)).toBeInTheDocument();
+    expect(within(row).getByText(/validadora/)).toBeInTheDocument();
+    expect(within(row).queryByText("Formato inválido")).not.toBeInTheDocument();
   });
 
   it("opens malformed persisted workflow JSON for safe correction", async () => {
