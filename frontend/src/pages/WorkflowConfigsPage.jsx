@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { Fragment, useState, useEffect } from "react";
 import { api } from "../api";
 import { AREA_ICONS, AVAILABLE_AREAS } from "../utils/constants";
 
@@ -155,14 +155,14 @@ export default function WorkflowConfigsPage() {
       return (
         <div className="workflow-preview">
           {flujo.map((area, i) => (
-            <React.Fragment key={area}>
+            <Fragment key={area}>
               <span className="workflow-preview-area">
                 {AREA_ICONS[area] || "•"} {area}
               </span>
               {i < flujo.length - 1 && (
                 <span className="workflow-preview-arrow">→</span>
               )}
-            </React.Fragment>
+            </Fragment>
           ))}
         </div>
       );
