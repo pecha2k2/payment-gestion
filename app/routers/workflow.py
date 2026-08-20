@@ -5,8 +5,9 @@ from sqlalchemy.orm import Session, selectinload
 from app.database import get_db
 from app.middleware.rate_limit import search_limits
 from app.models.user import User
-from app.models.payment import PaymentRequest, Document
+from app.models.payment import PaymentRequest
 from app.models.workflow import WorkflowConfig, WorkflowState, Comment
+from app.schemas.payment import PaymentRequestResponse
 from app.schemas.workflow import (
     WorkflowConfigCreate,
     WorkflowConfigUpdate,
@@ -63,7 +64,7 @@ def update_workflow_config(
 search_router = APIRouter(prefix="/api/search", tags=["search"])
 
 
-@search_router.get("")
+@search_router.get("", response_model=List[PaymentRequestResponse])
 @search_limits()
 def search_payments(
     request: Request,
@@ -165,28 +166,4 @@ def search_payments(
 
         query = query.outerjoin(Comment).filter(or_(*or_clauses))
 
-    results = query.order_by(PaymentRequest.created_at.desc()).limit(50).all()
-
-    # workflow_states already eagerly loaded — no additional queries per payment
-    response = []
-    for payment in results:
-        area_status = {ws.area.value: ws.estado.value for ws in payment.workflow_states}
-
-        response.append(
-            {
-                "id": payment.id,
-                "numero_peticion": payment.numero_peticion,
-                "propuesta_gasto": payment.propuesta_gasto,
-                "orden_pago": payment.orden_pago,
-                "numero_factura": payment.numero_factura,
-                "n_documento_contable": payment.n_documento_contable,
-                "fecha_pago": str(payment.fecha_pago) if payment.fecha_pago else None,
-                "estado_general": payment.estado_general.value,
-                "tipo_pago": payment.tipo_pago.value,
-                "monto_total": float(payment.monto_total),
-                "area_status": area_status,
-                "created_at": str(payment.created_at),
-            }
-        )
-
-    return response
+    return query.order_by(PaymentRequest.created_at.desc()).limit(50).all()

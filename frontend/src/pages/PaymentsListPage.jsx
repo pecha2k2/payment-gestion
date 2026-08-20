@@ -317,7 +317,7 @@ export default function PaymentsListPage({ user }) {
                         ) : pendingArea ? (
                           <span className="badge badge-en_proceso">{getAreaLabel(pendingArea)}</span>
                         ) : (
-                          <span className="badge badge-completada">Completado</span>
+                          <span className="badge">Estado no disponible</span>
                         )}
                       </td>
                       <td>{formatCurrency(payment.monto_total, payment.divisa)}</td>
