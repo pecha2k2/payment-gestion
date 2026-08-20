@@ -1,6 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import { api } from '../api';
-import { AREA_ICONS, AVAILABLE_AREAS } from '../utils/constants';
+import { useState, useEffect } from "react";
+import { api } from "../api";
+import { AREA_ICONS, AVAILABLE_AREAS } from "../utils/constants";
+
+const FLUJO_VALIDATION_ERROR =
+  'JSON inválido o formato incorrecto. Use: ["area1", "area2", ...]';
+const PERSISTED_FLUJO_ERROR =
+  "El flujo guardado contiene JSON inválido o un formato incorrecto. Corríjalo antes de guardar.";
+
+const validateFlujo = (value) => {
+  if (!Array.isArray(value) || value.length === 0)
+    throw new Error(FLUJO_VALIDATION_ERROR);
+  const validAreas = Object.keys(AREA_ICONS);
+  if (value.some((area) => !validAreas.includes(area)))
+    throw new Error(FLUJO_VALIDATION_ERROR);
+  return value;
+};
+
+const formatPersistedFlujo = (value) => {
+  try {
+    const parsed = typeof value === "string" ? JSON.parse(value) : value;
+    return { value: JSON.stringify(validateFlujo(parsed), null, 2), error: "" };
+  } catch {
+    const editableValue =
+      typeof value === "string" ? value : JSON.stringify(value, null, 2) || "";
+    return { value: editableValue, error: PERSISTED_FLUJO_ERROR };
+  }
+};
 
 export default function WorkflowConfigsPage() {
   const [configs, setConfigs] = useState([]);
@@ -9,14 +34,25 @@ export default function WorkflowConfigsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingConfig, setEditingConfig] = useState(null);
   const [formData, setFormData] = useState({
-    nombre: '',
-    descripcion: '',
-    tipo_pago: 'CON_FACTURA',
+    nombre: "",
+    descripcion: "",
+    tipo_pago: "CON_FACTURA",
     es_default: false,
-    flujo_json: JSON.stringify(['demandante', 'validadora', 'aprobadora', 'contabilidad', 'pagadora', 'sap'], null, 2),
+    flujo_json: JSON.stringify(
+      [
+        "demandante",
+        "validadora",
+        "aprobadora",
+        "contabilidad",
+        "pagadora",
+        "sap",
+      ],
+      null,
+      2,
+    ),
     activo: true,
   });
-  const [formError, setFormError] = useState('');
+  const [formError, setFormError] = useState("");
 
   useEffect(() => {
     loadConfigs();
@@ -27,8 +63,10 @@ export default function WorkflowConfigsPage() {
       const data = await api.getWorkflowConfigs();
       setConfigs(data);
     } catch (err) {
-      console.error('Error loading workflow configs:', err);
-      setLoadError('Error cargando las configuraciones de flujo. Intente recargar la página.');
+      console.error("Error loading workflow configs:", err);
+      setLoadError(
+        "Error cargando las configuraciones de flujo. Intente recargar la página.",
+      );
     } finally {
       setLoading(false);
     }
@@ -36,57 +74,59 @@ export default function WorkflowConfigsPage() {
 
   const parseFlujo = (flujoStr) => {
     try {
-      const parsed = JSON.parse(flujoStr);
-      if (!Array.isArray(parsed)) throw new Error('Must be an array');
-      if (parsed.length === 0) throw new Error('Must have at least one area');
-      const validAreas = Object.keys(AREA_ICONS);
-      for (const area of parsed) {
-        if (!validAreas.includes(area)) {
-          throw new Error(`Invalid area: ${area}`);
-        }
-      }
-      return parsed;
-    } catch (e) {
-      throw new Error('JSON inválido o formato incorrecto. Use: ["area1", "area2", ...]');
+      return validateFlujo(JSON.parse(flujoStr));
+    } catch {
+      throw new Error(FLUJO_VALIDATION_ERROR);
     }
   };
 
   const handleOpenModal = (config = null) => {
     if (config) {
+      const persistedFlujo = formatPersistedFlujo(config.flujo_json);
       setEditingConfig(config);
       setFormData({
         nombre: config.nombre,
-        descripcion: config.descripcion || '',
-        tipo_pago: config.tipo_pago || 'CON_FACTURA',
+        descripcion: config.descripcion || "",
+        tipo_pago: config.tipo_pago || "CON_FACTURA",
         es_default: config.es_default,
-        flujo_json: typeof config.flujo_json === 'string' 
-          ? JSON.stringify(JSON.parse(config.flujo_json), null, 2)
-          : JSON.stringify(config.flujo_json, null, 2),
+        flujo_json: persistedFlujo.value,
         activo: config.activo,
       });
+      setFormError(persistedFlujo.error);
     } else {
       setEditingConfig(null);
       setFormData({
-        nombre: '',
-        descripcion: '',
-        tipo_pago: 'CON_FACTURA',
+        nombre: "",
+        descripcion: "",
+        tipo_pago: "CON_FACTURA",
         es_default: false,
-        flujo_json: JSON.stringify(['demandante', 'validadora', 'aprobadora', 'contabilidad', 'pagadora', 'sap'], null, 2),
+        flujo_json: JSON.stringify(
+          [
+            "demandante",
+            "validadora",
+            "aprobadora",
+            "contabilidad",
+            "pagadora",
+            "sap",
+          ],
+          null,
+          2,
+        ),
         activo: true,
       });
+      setFormError("");
     }
-    setFormError('');
     setShowModal(true);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setFormError('');
+    setFormError("");
 
     try {
       // Validate JSON
       const flujo = parseFlujo(formData.flujo_json);
-      
+
       const payload = {
         nombre: formData.nombre,
         descripcion: formData.descripcion,
@@ -110,15 +150,18 @@ export default function WorkflowConfigsPage() {
 
   const renderFlujoPreview = (flujoJson) => {
     try {
-      const flujo = typeof flujoJson === 'string' ? JSON.parse(flujoJson) : flujoJson;
+      const flujo =
+        typeof flujoJson === "string" ? JSON.parse(flujoJson) : flujoJson;
       return (
         <div className="workflow-preview">
           {flujo.map((area, i) => (
             <React.Fragment key={area}>
               <span className="workflow-preview-area">
-                {AREA_ICONS[area] || '•'} {area}
+                {AREA_ICONS[area] || "•"} {area}
               </span>
-              {i < flujo.length - 1 && <span className="workflow-preview-arrow">→</span>}
+              {i < flujo.length - 1 && (
+                <span className="workflow-preview-arrow">→</span>
+              )}
             </React.Fragment>
           ))}
         </div>
@@ -135,14 +178,25 @@ export default function WorkflowConfigsPage() {
   return (
     <div>
       {loadError && (
-        <div style={{ color: 'var(--danger)', background: 'rgba(239,68,68,0.1)', padding: '1rem', borderRadius: '6px', marginBottom: '1rem' }}>
+        <div
+          style={{
+            color: "var(--danger)",
+            background: "rgba(239,68,68,0.1)",
+            padding: "1rem",
+            borderRadius: "6px",
+            marginBottom: "1rem",
+          }}
+        >
           ⚠️ {loadError}
         </div>
       )}
       <div className="flex justify-between items-center mb-3">
         <div>
           <h1>Configuración de Flujos</h1>
-          <p className="text-muted" style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
+          <p
+            className="text-muted"
+            style={{ fontSize: "0.875rem", marginTop: "0.25rem" }}
+          >
             Definí el orden de las áreas para cada tipo de flujo de trabajo
           </p>
         </div>
@@ -170,34 +224,45 @@ export default function WorkflowConfigsPage() {
                 </tr>
               </thead>
               <tbody>
-                {configs.map(config => (
+                {configs.map((config) => (
                   <tr key={config.id}>
                     <td>
                       <strong>{config.nombre}</strong>
                       {config.es_default && (
-                        <span className="badge badge-completada" style={{ marginLeft: '0.5rem' }}>
+                        <span
+                          className="badge badge-completada"
+                          style={{ marginLeft: "0.5rem" }}
+                        >
                           Default
                         </span>
                       )}
                     </td>
-                    <td>{config.descripcion || '-'}</td>
+                    <td>{config.descripcion || "-"}</td>
                     <td>
-                      <span className={`badge ${config.tipo_pago === 'SIN_FACTURA' ? 'badge-en_proceso' : 'badge-abierta'}`}>
-                        {config.tipo_pago === 'SIN_FACTURA' ? 'Sin Factura' : 'Con Factura'}
+                      <span
+                        className={`badge ${config.tipo_pago === "SIN_FACTURA" ? "badge-en_proceso" : "badge-abierta"}`}
+                      >
+                        {config.tipo_pago === "SIN_FACTURA"
+                          ? "Sin Factura"
+                          : "Con Factura"}
                       </span>
                     </td>
+                    <td>{renderFlujoPreview(config.flujo_json)}</td>
                     <td>
-                      {renderFlujoPreview(config.flujo_json)}
-                    </td>
-                    <td>
-                      <span className={`badge ${config.activo ? 'badge-completada' : 'badge-cancelada'}`}>
-                        {config.activo ? 'Activo' : 'Inactivo'}
+                      <span
+                        className={`badge ${config.activo ? "badge-completada" : "badge-cancelada"}`}
+                      >
+                        {config.activo ? "Activo" : "Inactivo"}
                       </span>
                     </td>
                     <td>
                       <button
                         className="btn btn-secondary"
-                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', marginRight: '0.5rem' }}
+                        style={{
+                          padding: "0.25rem 0.5rem",
+                          fontSize: "0.75rem",
+                          marginRight: "0.5rem",
+                        }}
                         onClick={() => handleOpenModal(config)}
                       >
                         Editar
@@ -213,29 +278,36 @@ export default function WorkflowConfigsPage() {
 
       {/* Help Card */}
       <div className="card mt-3">
-        <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>💡 Áreas disponibles</h3>
-        <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
-          {AVAILABLE_AREAS.map(area => (
+        <h3 style={{ fontSize: "1rem", marginBottom: "0.5rem" }}>
+          💡 Áreas disponibles
+        </h3>
+        <div className="flex gap-2" style={{ flexWrap: "wrap" }}>
+          {AVAILABLE_AREAS.map((area) => (
             <span key={area.value} className="badge badge-abierta">
               {area.label}
             </span>
           ))}
         </div>
-        <p className="text-muted mt-2" style={{ fontSize: '0.8rem' }}>
-          El orden en que aparecen las áreas define la secuencia del flujo de trabajo.
-          Los pagos nuevos usarán el flujo marcado como "Default".
+        <p className="text-muted mt-2" style={{ fontSize: "0.8rem" }}>
+          El orden en que aparecen las áreas define la secuencia del flujo de
+          trabajo. Los pagos nuevos usarán el flujo marcado como "Default".
         </p>
       </div>
 
       {/* Workflow Config Modal */}
       {showModal && (
         <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: '600px' }}>
+          <div className="modal" style={{ maxWidth: "600px" }}>
             <div className="modal-header">
               <h3 className="modal-title">
-                {editingConfig ? 'Editar Flujo' : 'Nuevo Flujo'}
+                {editingConfig ? "Editar Flujo" : "Nuevo Flujo"}
               </h3>
-              <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
+              <button
+                className="modal-close"
+                onClick={() => setShowModal(false)}
+              >
+                ×
+              </button>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
@@ -244,7 +316,9 @@ export default function WorkflowConfigsPage() {
                   type="text"
                   className="form-input"
                   value={formData.nombre}
-                  onChange={(e) => setFormData(prev => ({ ...prev, nombre: e.target.value }))}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, nombre: e.target.value }))
+                  }
                   placeholder="Ej: Flujo con Factura"
                   required
                 />
@@ -256,7 +330,12 @@ export default function WorkflowConfigsPage() {
                   type="text"
                   className="form-input"
                   value={formData.descripcion}
-                  onChange={(e) => setFormData(prev => ({ ...prev, descripcion: e.target.value }))}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      descripcion: e.target.value,
+                    }))
+                  }
                   placeholder="Ej: Para pagos que requieren validación de factura"
                 />
               </div>
@@ -266,7 +345,12 @@ export default function WorkflowConfigsPage() {
                 <select
                   className="form-select"
                   value={formData.tipo_pago}
-                  onChange={(e) => setFormData(prev => ({ ...prev, tipo_pago: e.target.value }))}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      tipo_pago: e.target.value,
+                    }))
+                  }
                   required
                 >
                   <option value="CON_FACTURA">Con Factura</option>
@@ -275,43 +359,78 @@ export default function WorkflowConfigsPage() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Flujo (JSON array de áreas) *</label>
+                <label className="form-label">
+                  Flujo (JSON array de áreas) *
+                </label>
                 <textarea
                   className="form-input"
                   value={formData.flujo_json}
-                  onChange={(e) => setFormData(prev => ({ ...prev, flujo_json: e.target.value }))}
-                  style={{ fontFamily: 'monospace', minHeight: '150px' }}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      flujo_json: e.target.value,
+                    }))
+                  }
+                  style={{ fontFamily: "monospace", minHeight: "150px" }}
                   placeholder='["demandante", "validadora", "aprobadora", "contabilidad", "pagadora", "sap"]'
                   required
                 />
-                <p className="text-muted" style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                  Usá comillas para los nombres de áreas. Ej: ["demandante", "validadora"]
+                <p
+                  className="text-muted"
+                  style={{ fontSize: "0.75rem", marginTop: "0.25rem" }}
+                >
+                  Usá comillas para los nombres de áreas. Ej: ["demandante",
+                  "validadora"]
                 </p>
               </div>
 
               {formError && (
-                <div style={{ color: 'var(--danger)', padding: '0.5rem', background: 'rgba(239,68,68,0.1)', borderRadius: '4px', marginBottom: '1rem' }}>
+                <div
+                  style={{
+                    color: "var(--danger)",
+                    padding: "0.5rem",
+                    background: "rgba(239,68,68,0.1)",
+                    borderRadius: "4px",
+                    marginBottom: "1rem",
+                  }}
+                >
                   {formError}
                 </div>
               )}
 
               <div className="form-group">
-                <label className="flex items-center gap-2" style={{ cursor: 'pointer' }}>
+                <label
+                  className="flex items-center gap-2"
+                  style={{ cursor: "pointer" }}
+                >
                   <input
                     type="checkbox"
                     checked={formData.es_default}
-                    onChange={(e) => setFormData(prev => ({ ...prev, es_default: e.target.checked }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        es_default: e.target.checked,
+                      }))
+                    }
                   />
                   <span>Flujo por defecto para nuevas peticiones</span>
                 </label>
               </div>
 
               <div className="form-group">
-                <label className="flex items-center gap-2" style={{ cursor: 'pointer' }}>
+                <label
+                  className="flex items-center gap-2"
+                  style={{ cursor: "pointer" }}
+                >
                   <input
                     type="checkbox"
                     checked={formData.activo}
-                    onChange={(e) => setFormData(prev => ({ ...prev, activo: e.target.checked }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        activo: e.target.checked,
+                      }))
+                    }
                   />
                   <span>Activo</span>
                 </label>
@@ -320,17 +439,27 @@ export default function WorkflowConfigsPage() {
               {/* Preview */}
               <div className="form-group">
                 <label className="form-label">Vista previa:</label>
-                <div style={{ padding: '0.75rem', background: 'var(--gray-100)', borderRadius: '6px' }}>
+                <div
+                  style={{
+                    padding: "0.75rem",
+                    background: "var(--gray-100)",
+                    borderRadius: "6px",
+                  }}
+                >
                   {renderFlujoPreview(formData.flujo_json)}
                 </div>
               </div>
 
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowModal(false)}
+                >
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  {editingConfig ? 'Guardar' : 'Crear'}
+                  {editingConfig ? "Guardar" : "Crear"}
                 </button>
               </div>
             </form>
